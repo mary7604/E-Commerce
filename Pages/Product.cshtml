@@ -1,0 +1,320 @@
+﻿@page "{id:int}"
+@model WebApplication1.Pages.ProductModel
+@{
+    Layout = null;
+    ViewData["Title"] = Model.Produit?.Nom ?? "Produit";
+}
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8f9fa;
+        }
+
+        .navbar {
+            background: #232f3e;
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .product-image {
+            max-width: 100%;
+            height: 400px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: white;
+            padding: 2rem;
+        }
+
+        .rating {
+            color: #ffc107;
+            font-size: 1.5rem;
+        }
+
+        .review-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stars {
+            color: #ffc107;
+        }
+
+        .star-rating {
+            display: inline-flex;
+            gap: 0.25rem;
+            cursor: pointer;
+            font-size: 2rem;
+        }
+
+            .star-rating i {
+                color: #ddd;
+                transition: color 0.2s;
+            }
+
+                .star-rating i.active, .star-rating i:hover, .star-rating i:hover ~ i {
+                    color: #ffc107;
+                }
+
+        .product-placeholder {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 8rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><i class="bi bi-shop"></i> Boutique</a>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        @if (Model.Produit == null)
+        {
+            <div class="alert alert-warning">Produit introuvable</div>
+        }
+        else
+        {
+            <div class="row">
+                <!-- Image produit -->
+                <div class="col-md-6">
+                    @if (!string.IsNullOrEmpty(Model.Produit.ImageUrl))
+                    {
+                        <img src="@Model.Produit.ImageUrl" class="product-image" alt="@Model.Produit.Nom" />
+                    }
+                    else
+                    {
+                        <div class="product-placeholder">📦</div>
+                    }
+                </div>
+
+                <!-- Infos produit -->
+                <div class="col-md-6">
+                    <h1>@Model.Produit.Nom</h1>
+
+                    <!-- Note moyenne -->
+                    <div class="mb-3">
+                        <span class="rating">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                if (i <= Model.NoteMoyenne)
+                                {
+                                    <i class="bi bi-star-fill"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-star"></i>
+                                }
+                            }
+                        </span>
+                        <span class="ms-2">@Model.NoteMoyenne.ToString("F1")/5 (@Model.NombreAvis avis)</span>
+                    </div>
+
+                    <h2 class="text-danger">@Model.Produit.Prix.ToString("N2") MAD</h2>
+
+                    @if (!string.IsNullOrEmpty(Model.Produit.Description))
+                    {
+                        <p class="mt-3">@Model.Produit.Description</p>
+                    }
+
+                    <p class="mt-3">
+                        <strong>Stock :</strong>
+                        @if (Model.Produit.Stock > 10)
+                        {
+                            <span class="text-success">En stock</span>
+                        }
+                        else if (Model.Produit.Stock > 0)
+                        {
+                            <span class="text-warning">Plus que @Model.Produit.Stock en stock</span>
+                        }
+                        else
+                        {
+                            <span class="text-danger">Rupture de stock</span>
+                        }
+                    </p>
+
+                    <button class="btn btn-warning btn-lg w-100 mt-3" onclick="addToCartAndRedirect(@Model.Produit.Id, '@Model.Produit.Nom', @Model.Produit.Prix, '@Model.Produit.ImageUrl')" @(Model.Produit.Stock == 0 ? "disabled" : "")>
+                        <i class="bi bi-cart-plus"></i> Ajouter au panier
+                    </button>
+                </div>
+            </div>
+
+            <!-- Avis clients -->
+            <div class="row mt-5">
+                <div class="col-12">
+                    <h3><i class="bi bi-chat-dots"></i> Avis clients (@Model.NombreAvis)</h3>
+
+                    <!-- Formulaire avis (si connecté) -->
+                    @if (Model.IsClientLoggedIn && !Model.ClientADejaCommente)
+                    {
+                        <div class="review-card mb-4">
+                            <h5>Donner votre avis</h5>
+                            <form method="post">
+                                <div class="mb-3">
+                                    <label class="form-label">Note</label>
+                                    <div class="star-rating" id="starRating">
+                                        <i class="bi bi-star-fill" data-rating="1"></i>
+                                        <i class="bi bi-star-fill" data-rating="2"></i>
+                                        <i class="bi bi-star-fill" data-rating="3"></i>
+                                        <i class="bi bi-star-fill" data-rating="4"></i>
+                                        <i class="bi bi-star-fill" data-rating="5"></i>
+                                    </div>
+                                    <input type="hidden" name="Note" id="noteInput" required />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Commentaire</label>
+                                    <textarea name="Commentaire" class="form-control" rows="3" maxlength="1000" placeholder="Partagez votre expérience avec ce produit..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send"></i> Publier mon avis
+                                </button>
+                            </form>
+                        </div>
+                    }
+                    else if (Model.ClientADejaCommente)
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i>
+                            <strong>Merci pour votre avis !</strong><br>
+                            Votre avis a été publié avec succès.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-info-circle"></i>
+                            <a href="/Account/Login?returnUrl=/Product/@Model.Produit.Id">Connectez-vous</a> pour laisser un avis.
+                        </div>
+                    }
+
+                    <!-- Liste des avis -->
+                    @foreach (var avis in Model.Avis)
+                    {
+                        <div class="review-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>@avis.Client?.Nom</strong>
+                                    <div class="stars mt-1">
+                                        @for (int i = 1; i <= 5; i++)
+                                        {
+                                            if (i <= avis.Note)
+                                            {
+                                                <i class="bi bi-star-fill"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-star"></i>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                                <small class="text-muted">@avis.DateAvis.ToString("dd/MM/yyyy")</small>
+                            </div>
+                            @if (!string.IsNullOrEmpty(avis.Commentaire))
+                            {
+                                <p class="mt-2 mb-0">@avis.Commentaire</p>
+                            }
+                        </div>
+                    }
+
+                    @if (!Model.Avis.Any())
+                    {
+                        <p class="text-muted text-center py-4">
+                            <i class="bi bi-chat-quote" style="font-size: 3rem; opacity: 0.3;"></i><br>
+                            Aucun avis pour le moment. Soyez le premier à donner votre avis !
+                        </p>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <script>
+        // Gestion notation étoiles
+        const stars = document.querySelectorAll('#starRating i');
+        const noteInput = document.getElementById('noteInput');
+
+        stars.forEach((star, index) => {
+            star.addEventListener('click', function() {
+                const rating = this.dataset.rating;
+                noteInput.value = rating;
+
+                stars.forEach((s, i) => {
+                    if (i < rating) {
+                        s.classList.add('active');
+                    } else {
+                        s.classList.remove('active');
+                    }
+                });
+            });
+
+            star.addEventListener('mouseover', function() {
+                const rating = this.dataset.rating;
+                stars.forEach((s, i) => {
+                    if (i < rating) {
+                        s.style.color = '#ffc107';
+                    } else {
+                        s.style.color = '#ddd';
+                    }
+                });
+            });
+        });
+
+        document.getElementById('starRating')?.addEventListener('mouseout', function() {
+            const currentRating = noteInput.value;
+            stars.forEach((s, i) => {
+                if (i < currentRating) {
+                    s.style.color = '#ffc107';
+                } else {
+                    s.style.color = '#ddd';
+                }
+            });
+        });
+
+        function addToCartAndRedirect(id, nom, prix, imageUrl) {
+            // Récupérer le panier
+            let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+            // Chercher si le produit existe
+            const existingItem = cart.find(item => item.id === id);
+
+            if (existingItem) {
+                existingItem.quantity++;
+            } else {
+                cart.push({ id, nom, prix, imageUrl, quantity: 1 });
+            }
+
+            // Sauvegarder
+            localStorage.setItem('cart', JSON.stringify(cart));
+
+            // Rediriger vers la boutique
+            window.location.href = '/';
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

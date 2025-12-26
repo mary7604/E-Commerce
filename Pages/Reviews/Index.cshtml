@@ -1,0 +1,181 @@
+﻿@page
+@model WebApplication1.Pages.Reviews.IndexModel
+@{
+    ViewData["Title"] = "Gestion des Avis";
+}
+
+<div class="container-fluid px-4">
+    <h1 class="mt-4">
+        <i class="fas fa-star"></i> Gestion des Avis
+    </h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="/Admin/Index">Dashboard</a></li>
+        <li class="breadcrumb-item active">Avis</li>
+    </ol>
+
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-warning text-white mb-4">
+                <div class="card-body">
+                    <h4>@Model.AvisEnAttente</h4>
+                    <small>En attente d'approbation</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-success text-white mb-4">
+                <div class="card-body">
+                    <h4>@Model.AvisApprouves</h4>
+                    <small>Avis approuvés</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-info text-white mb-4">
+                <div class="card-body">
+                    <h4>@Model.NoteMoyenneGlobale.ToString("F1")</h4>
+                    <small>Note moyenne globale</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-primary text-white mb-4">
+                <div class="card-body">
+                    <h4>@Model.TotalAvis</h4>
+                    <small>Total des avis</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-filter"></i> Filtres
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select name="statut" class="form-select" onchange="this.form.submit()">
+                        <option value="">Tous les statuts</option>
+                        <option value="attente" selected="@(Model.Statut == "attente")">En attente</option>
+                        <option value="approuve" selected="@(Model.Statut == "approuve")">Approuvés</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="note" class="form-select" onchange="this.form.submit()">
+                        <option value="">Toutes les notes</option>
+                        <option value="5">⭐⭐⭐⭐⭐ (5 étoiles)</option>
+                        <option value="4">⭐⭐⭐⭐ (4 étoiles)</option>
+                        <option value="3">⭐⭐⭐ (3 étoiles)</option>
+                        <option value="2">⭐⭐ (2 étoiles)</option>
+                        <option value="1">⭐ (1 étoile)</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Liste des avis -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="fas fa-table"></i> Liste des avis
+        </div>
+        <div class="card-body">
+            @if (Model.Avis.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Produit</th>
+                                <th>Client</th>
+                                <th>Note</th>
+                                <th>Commentaire</th>
+                                <th>Date</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var avis in Model.Avis)
+                            {
+                                <tr>
+                                    <td>@avis.Id</td>
+                                    <td>
+                                        <a href="/Product/@avis.ProduitId" target="_blank">
+                                            @avis.Produit?.Nom
+                                        </a>
+                                    </td>
+                                    <td>@avis.Client?.Nom</td>
+                                    <td>
+                                        <span class="text-warning">
+                                            @for (int i = 1; i <= 5; i++)
+                                            {
+                                                if (i <= avis.Note)
+                                                {
+                                                    <i class="fas fa-star"></i>
+                                                }
+                                                else
+                                                {
+                                                    <i class="far fa-star"></i>
+                                                }
+                                            }
+                                        </span>
+                                        (@avis.Note/5)
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(avis.Commentaire))
+                                        {
+                                            <span>@(avis.Commentaire.Length > 50 ? avis.Commentaire.Substring(0, 50) + "..." : avis.Commentaire)</span>
+                                        }
+                                        else
+                                        {
+                                            <em class="text-muted">Pas de commentaire</em>
+                                        }
+                                    </td>
+                                    <td>@avis.DateAvis.ToString("dd/MM/yyyy")</td>
+                                    <td>
+                                        @if (avis.EstApprouve)
+                                        {
+                                            <span class="badge bg-success">Approuvé</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning">En attente</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!avis.EstApprouve)
+                                        {
+                                            <form method="post" asp-page-handler="Approve" class="d-inline">
+                                                <input type="hidden" name="id" value="@avis.Id" />
+                                                <button type="submit" class="btn btn-sm btn-success" title="Approuver">
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                        <form method="post" asp-page-handler="Delete" class="d-inline" onsubmit="return confirm('Supprimer cet avis ?')">
+                                            <input type="hidden" name="id" value="@avis.Id" />
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Supprimer">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Aucun avis trouvé
+                </div>
+            }
+        </div>
+    </div>
+</div>
