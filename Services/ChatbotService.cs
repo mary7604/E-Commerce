@@ -7,92 +7,94 @@ namespace WebApplication1.Services
 {
     public class ChatbotService
     {
+        private readonly IConfiguration _configuration;
         private readonly ApplicationDbContext _context;
         private readonly HttpClient _httpClient;
 
-        public ChatbotService(ApplicationDbContext context, IHttpClientFactory httpClientFactory)
+        public ChatbotService(
+            IConfiguration configuration,
+            ApplicationDbContext context,
+            IHttpClientFactory httpClientFactory)
         {
+            _configuration = configuration;
             _context = context;
             _httpClient = httpClientFactory.CreateClient();
         }
 
         public async Task<string> GetChatResponseAsync(string userMessage)
         {
-            try
+            var apiKey = _configuration["GoogleGemini:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+                return " Clé API Gemini manquante.";
+
+            // On prend tous les produits avec stock > 0
+            var produits = await _context.Produits
+                .Where(p => p.Stock > 0)
+                .Select(p => new { p.Nom, p.Prix, p.Stock })
+                .ToListAsync();
+
+            // Création du catalogue pour le prompt
+            var catalogue = string.Join("\n",
+                produits.Select(p => $"- {p.Nom} : {p.Prix} MAD (Stock {p.Stock})"));
+
+            // Prompt 
+            var prompt = $"""
+    Tu es l'assistant officiel de MimiBout (e-commerce marocain).
+    
+    Catalogue disponible :
+    {catalogue}
+
+    Règles :
+    - Réponds en français
+    - Sois clair et court
+    - Propose uniquement les produits listés ci-dessus
+    - N'invente pas de produits qui ne sont pas dans le catalogue
+    - Encourage l'achat
+
+    Question client : {userMessage}
+    """;
+
+            var body = new
             {
-                // Récupérer les produits pour donner du contexte à l'IA
-                var produits = await _context.Produits
-                    .Where(p => p.Stock > 0)
-                    .Select(p => new { p.Nom, p.Prix, p.Description, p.Stock })
-                    .Take(20)
-                    .ToListAsync();
-
-                var catalogueInfo = string.Join("\n", produits.Select(p =>
-                    $"- {p.Nom}: {p.Prix} MAD (Stock: {p.Stock}) - {p.Description}"));
-
-                // Construire le prompt pour Ollama
-                var systemPrompt = $@"Tu es un assistant virtuel pour MimiBout, une boutique e-commerce marocaine.
-
-CATALOGUE ACTUEL (produits en stock):
-{catalogueInfo}
-
-RÈGLES IMPORTANTES:
-- Réponds UNIQUEMENT en français
-- Sois amical, professionnel et concis (maximum 3-4 phrases)
-- Recommande des produits du catalogue ci-dessus
-- Si un produit n'est pas dans le catalogue, dis-le poliment
-- Utilise les prix exacts du catalogue
-- Encourage à ajouter au panier
-- Ne parle QUE de produits disponibles en stock
-
-Question du client: {userMessage}
-
-Réponse courte et utile:";
-
-                // Appeler Ollama (local)
-                var requestBody = new
+                contents = new[]
                 {
-                    model = "llama3.2",
-                    prompt = systemPrompt,
-                    stream = false,
-                    options = new
-                    {
-                        temperature = 0.7,
-                        num_predict = 200  // Limiter la longueur
-                    }
-                };
-
-                var request = new HttpRequestMessage(HttpMethod.Post, "http://localhost:11434/api/generate");
-                request.Content = new StringContent(
-                    JsonSerializer.Serialize(requestBody),
-                    Encoding.UTF8,
-                    "application/json"
-                );
-
-                var response = await _httpClient.SendAsync(request);
-
-                if (!response.IsSuccessStatusCode)
+            new
+            {
+                parts = new[]
                 {
-                    return "❌ Erreur: Ollama n'est pas démarré. Lancez 'ollama serve' dans PowerShell.";
+                    new { text = prompt }
                 }
-
-                var responseContent = await response.Content.ReadAsStringAsync();
-                var jsonResponse = JsonDocument.Parse(responseContent);
-
-                var assistantMessage = jsonResponse.RootElement
-                    .GetProperty("response")
-                    .GetString();
-
-                return assistantMessage ?? "Je n'ai pas pu générer une réponse.";
-            }
-            catch (HttpRequestException)
-            {
-                return "❌ Impossible de se connecter à Ollama. Assurez-vous qu'Ollama est installé et lancé avec 'ollama serve'.";
-            }
-            catch (Exception ex)
-            {
-                return $"❌ Erreur: {ex.Message}";
             }
         }
+            };
+
+        
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
+
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(body),
+                    Encoding.UTF8,
+                    "application/json")
+            };
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return $" Erreur Gemini {response.StatusCode} : {error}";
+            }
+
+            var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+            return json.RootElement
+                .GetProperty("candidates")[0]
+                .GetProperty("content")
+                .GetProperty("parts")[0]
+                .GetProperty("text")
+                .GetString() ?? "Aucune réponse générée.";
+        }
     }
-}
+    }
