@@ -4,8 +4,12 @@ using WebApplication1.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// CACHE
+builder.Services.AddMemoryCache();
+
 // Add services
 builder.Services.AddRazorPages();
+builder.Services.AddControllers();  //  Pour API
 
 // Database Context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -13,18 +17,21 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30); // Session expire après 30 minutes
-    options.Cookie.HttpOnly = true; // Cookie accessible uniquement côté serveur
-    options.Cookie.IsEssential = true; // Cookie essentiel (pas affecté par RGPD)
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
 });
 
 builder.Services.AddDistributedMemoryCache();
 
-// Services pour Email et Factures
+// Services
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InvoiceService>();
-builder.Services.AddHttpClient();  // Pour appeler Ollama
-builder.Services.AddScoped<ChatbotService>();  // Service chatbot
+builder.Services.AddScoped<ClientAuthService>();
+
+// Chatbot avec Gemini API
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ChatbotService>();
 
 var app = builder.Build();
 
@@ -37,13 +44,13 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseSession();
-
 app.UseAuthorization();
 
 app.MapRazorPages();
+app.MapControllers();  //  Pour API
 
 app.Run();
+
+//m

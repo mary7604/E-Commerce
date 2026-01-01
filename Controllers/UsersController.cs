@@ -5,7 +5,7 @@ namespace WebApplication1.Controllers
 {
     public class UsersController : Controller
     {
-        // Liste temporaire (en production, utilisez une base de données)
+        // Liste temporaire 
         private static List<User> users = new List<User>
         {
             new User { Id = 1, FirstName = "Ahmed", LastName = "Benali", Email = "ahmed@example.com", Age = 25 },

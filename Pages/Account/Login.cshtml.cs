@@ -1,77 +1,62 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using WebApplication1.Data;
+using WebApplication1.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace WebApplication1.Pages.Account
 {
     public class LoginModel : PageModel
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ClientAuthService _authService;
 
-        public LoginModel(ApplicationDbContext context)
+        public LoginModel(ClientAuthService authService)
         {
-            _context = context;
+            _authService = authService;
         }
 
         [BindProperty]
+        [Required]
+        [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [BindProperty]
+        [Required]
         public string Password { get; set; } = string.Empty;
 
-        public string? ErrorMessage { get; set; }
-        public string? SuccessMessage { get; set; }
+        [BindProperty]
+        public bool RememberMe { get; set; }
 
-        public void OnGet(string? message)
+        public void OnGet()
         {
-            if (message == "registered")
-            {
-                SuccessMessage = "Compte créé avec succès ! Connectez-vous maintenant.";
-            }
-
-            // Si déjà connecté, rediriger vers le profil
-            if (HttpContext.Session.GetString("IsClientLoggedIn") == "true")
-            {
-                Response.Redirect("/Account/Profile");
-            }
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
-            try
+            if (!ModelState.IsValid)
             {
-                // Rechercher le client dans la base de données
-                var client = await _context.Clients
-                    .FirstOrDefaultAsync(c => c.Email == Email);
-
-                // Vérifier email et mot de passe
-                if (client != null && client.Password == Password)
-                {
-                    // Créer une session client avec protection NULL
-                    HttpContext.Session.SetString("IsClientLoggedIn", "true");
-                    HttpContext.Session.SetString("ClientId", client.Id.ToString());
-                    HttpContext.Session.SetString("ClientNom", client.Nom ?? "Client");
-                    HttpContext.Session.SetString("ClientEmail", client.Email ?? "");  
-
-                    // Rediriger vers la page d'origine ou la boutique
-                    var returnUrl = Request.Query["returnUrl"].ToString();
-                    if (!string.IsNullOrEmpty(returnUrl))
-                    {
-                        return Redirect(returnUrl);
-                    }
-
-                    return RedirectToPage("/Index");
-                }
-
-                ErrorMessage = "Email ou mot de passe incorrect.";
                 return Page();
             }
-            catch (Exception ex)
+
+            var client = await _authService.Login(Email, Password);
+
+            if (client == null)
             {
-                ErrorMessage = $"Erreur : {ex.Message}";
+                TempData["Error"] = "Email ou mot de passe incorrect";
                 return Page();
             }
+
+            // Stocker les infos client en session
+            HttpContext.Session.SetInt32("ClientId", client.Id);
+            HttpContext.Session.SetString("ClientName", $"{client.Prenom} {client.Nom}");
+            HttpContext.Session.SetString("ClientEmail", client.Email);
+
+            if (client.EstAdmin)
+            {
+                HttpContext.Session.SetString("IsAdmin", "true");
+            }
+
+            TempData["Message"] = $"Bienvenue {client.Prenom} !";
+            return RedirectToPage("/Index");
         }
     }
 }

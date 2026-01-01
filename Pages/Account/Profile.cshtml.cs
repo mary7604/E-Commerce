@@ -20,29 +20,29 @@ namespace WebApplication1.Pages.Account
 
         public async Task<IActionResult> OnGetAsync()
         {
-            // Vérifier si l'utilisateur est connecté
-            var clientIdStr = HttpContext.Session.GetString("ClientId");
-            if (string.IsNullOrEmpty(clientIdStr))
+            //  Lire ClientId  
+            int? clientId = HttpContext.Session.GetInt32("ClientId");
+
+            if (!clientId.HasValue)
             {
+                // Utilisateur non connecté
                 return RedirectToPage("/Account/Login");
             }
 
-            var clientId = int.Parse(clientIdStr);
-
             // Charger les informations du client
             Client = await _context.Clients
-                .FirstOrDefaultAsync(c => c.Id == clientId);
+                .FirstOrDefaultAsync(c => c.Id == clientId.Value);
 
             if (Client == null)
             {
-                // Session invalide, déconnecter
+                // Session invalide
                 HttpContext.Session.Clear();
                 return RedirectToPage("/Account/Login");
             }
 
             // Charger l'historique des commandes
             Commandes = await _context.Commandes
-                .Where(c => c.ClientId == clientId)
+                .Where(c => c.ClientId == clientId.Value)
                 .OrderByDescending(c => c.DateCommande)
                 .ToListAsync();
 

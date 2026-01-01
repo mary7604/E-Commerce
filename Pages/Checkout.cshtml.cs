@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using WebApplication1.Data;
 using WebApplication1.Models;
-using System.Text.Json;
 
 namespace WebApplication1.Pages
 {
@@ -17,110 +17,156 @@ namespace WebApplication1.Pages
         }
 
         [BindProperty]
-        public string CartData { get; set; } = string.Empty;
+        public string NomClient { get; set; } = string.Empty;
 
         [BindProperty]
-        public string TotalAmount { get; set; } = string.Empty;
+        public string EmailClient { get; set; } = string.Empty;
 
-        public bool OrderSuccess { get; set; }
-        public int OrderId { get; set; }
-        public string? ClientEmail { get; set; }
-        public string? ErrorMessage { get; set; }
+        [BindProperty]
+        public string TelephoneClient { get; set; } = string.Empty;
 
-        public IActionResult OnGet()
+        [BindProperty]
+        public string AdresseLivraison { get; set; } = string.Empty;
+
+        public List<CartItem> CartItems { get; set; } = new List<CartItem>();
+        public decimal Subtotal { get; set; }
+        public decimal ShippingCost { get; set; }
+        public decimal Total { get; set; }
+
+        public void OnGet()
         {
-            // Vérifier si le client est connecté
-            var clientIdStr = HttpContext.Session.GetString("ClientId");
-            if (string.IsNullOrEmpty(clientIdStr))
+            LoadCart();
+            
+            // Pré-remplir avec les infos du client connecté si disponible
+            var clientId = HttpContext.Session.GetInt32("ClientId");
+            if (clientId.HasValue)
             {
-                return RedirectToPage("/Account/Login", new { returnUrl = "/Checkout" });
+                var client = _context.Clients.Find(clientId.Value);
+                if (client != null)
+                {
+                    NomClient = $"{client.Prenom} {client.Nom}";
+                    EmailClient = client.Email;
+                    TelephoneClient = client.Telephone ?? "";
+                    AdresseLivraison = client.Adresse ?? "";
+                }
             }
-
-            return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
-            try
+            if (!ModelState.IsValid)
             {
-                // Vérifier si le client est connecté
-                var clientIdStr = HttpContext.Session.GetString("ClientId");
-                if (string.IsNullOrEmpty(clientIdStr))
-                {
-                    return RedirectToPage("/Account/Login", new { returnUrl = "/Checkout" });
-                }
-
-                var clientId = int.Parse(clientIdStr);
-
-                // Récupérer les informations du client
-                var client = await _context.Clients.FindAsync(clientId);
-                if (client == null)
-                {
-                    ErrorMessage = "Client introuvable";
-                    return Page();
-                }
-
-                // Parser le panier
-                var cartItems = JsonSerializer.Deserialize<List<CartItem>>(CartData);
-                if (cartItems == null || !cartItems.Any())
-                {
-                    ErrorMessage = "Votre panier est vide";
-                    return Page();
-                }
-
-                // Calculer le montant total
-                decimal subtotal = cartItems.Sum(item => item.prix * item.quantity);
-                decimal shipping = subtotal >= 500 ? 0 : 50;
-                decimal total = subtotal + shipping;
-
-                // Créer la commande
-                var commande = new Commande
-                {
-                    ClientId = clientId,
-                    DateCommande = DateTime.Now,
-                    MontantTotal = total,
-                    Statut = "En attente"
-                };
-
-                _context.Commandes.Add(commande);
-                await _context.SaveChangesAsync();
-
-                // Mettre à jour le stock des produits
-                foreach (var item in cartItems)
-                {
-                    var produit = await _context.Produits.FindAsync(item.id);
-                    if (produit != null)
-                    {
-                        produit.Stock -= item.quantity;
-                        if (produit.Stock < 0) produit.Stock = 0;
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-
-                // Succès
-                OrderSuccess = true;
-                OrderId = commande.Id;
-                ClientEmail = client.Email;
-
+                LoadCart();
                 return Page();
             }
-            catch (Exception ex)
+
+            // Récupérer le panier
+            var cart = GetCartFromSessionOrCookie();
+
+            if (cart.Count == 0)
             {
-                ErrorMessage = $"Erreur lors de la création de la commande : {ex.Message}";
-                return Page();
+                TempData["Error"] = "Votre panier est vide !";
+                return RedirectToPage("/Index");
+            }
+
+            // Vérifier le stock avant de créer la commande
+            foreach (var item in cart)
+            {
+                var produit = await _context.Produits.FindAsync(item.ProduitId);
+                if (produit == null || produit.Stock < item.Quantite)
+                {
+                    TempData["Error"] = $"Stock insuffisant pour {item.Nom}";
+                    LoadCart();
+                    return Page();
+                }
+            }
+
+            // Calculer les totaux
+            var subtotal = cart.Sum(item => item.Prix * item.Quantite);
+            var shippingCost = subtotal >= 500 ? 0 : 50;
+            var total = subtotal + shippingCost;
+
+            // Récupérer l'ID du client connecté
+            var clientId = HttpContext.Session.GetInt32("ClientId");
+
+            // Créer la commande
+            var commande = new Commande
+            {
+                ClientId = clientId,  
+                NomClient = NomClient,
+                EmailClient = EmailClient,
+                TelephoneClient = TelephoneClient,
+                AdresseLivraison = AdresseLivraison,
+                DateCommande = DateTime.Now,
+                Statut = "En attente",
+                MontantTotal = total,
+                LignesCommande = cart.Select(item => new LigneCommande
+                {
+                    NomProduit = item.Nom,
+                    Quantite = item.Quantite,
+                    PrixUnitaire = item.Prix
+                }).ToList()
+            };
+
+            _context.Commandes.Add(commande);
+
+            // Décrémenter le stock
+            foreach (var item in cart)
+            {
+                var produit = await _context.Produits.FindAsync(item.ProduitId);
+                if (produit != null)
+                {
+                    produit.Stock -= item.Quantite;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Vider le panier
+            ClearCart();
+
+            // Rediriger vers la page de paiement
+            TempData["Message"] = "Commande créée avec succès ! Procédez au paiement.";
+            return RedirectToPage("/Payment", new { id = commande.Id });
+        }
+
+        private void LoadCart()
+        {
+            var cart = GetCartFromSessionOrCookie();
+            CartItems = cart;
+            Subtotal = cart.Sum(item => item.Prix * item.Quantite);
+            ShippingCost = Subtotal >= 500 ? 0 : 50;
+            Total = Subtotal + ShippingCost;
+        }
+
+        private List<CartItem> GetCartFromSessionOrCookie()
+        {
+            var cartJson = HttpContext.Session.GetString("Cart");
+            
+            if (string.IsNullOrEmpty(cartJson))
+            {
+                cartJson = Request.Cookies["Cart"];
+            }
+
+            if (string.IsNullOrEmpty(cartJson))
+            {
+                return new List<CartItem>();
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
+            }
+            catch
+            {
+                return new List<CartItem>();
             }
         }
 
-        // Classe pour désérialiser le panier
-        public class CartItem
+        private void ClearCart()
         {
-            public int id { get; set; }
-            public string nom { get; set; } = string.Empty;
-            public decimal prix { get; set; }
-            public int quantity { get; set; }
-            public int stock { get; set; }
-            public string? imageUrl { get; set; }
+            HttpContext.Session.Remove("Cart");
+            Response.Cookies.Delete("Cart");
         }
     }
 }

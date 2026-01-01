@@ -25,7 +25,6 @@ namespace WebApplication1.Models
 
         public bool EstApprouve { get; set; } = false;
 
-        // Navigation properties
         public Produit? Produit { get; set; }
         public Client? Client { get; set; }
     }

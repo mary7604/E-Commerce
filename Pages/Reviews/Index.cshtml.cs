@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Models;
-using AdminModel = WebApplication1.Models.Admin;
 
 namespace WebApplication1.Pages.Reviews
 {
@@ -54,24 +53,16 @@ namespace WebApplication1.Pages.Reviews
                 .OrderByDescending(a => a.DateAvis)
                 .ToListAsync();
 
-            // Statistiques globales (optimisé)
-            var statistiques = await _context.Avis
-                .GroupBy(a => 1)
-                .Select(g => new
-                {
-                    Total = g.Count(),
-                    EnAttente = g.Count(a => !a.EstApprouve),
-                    Approuves = g.Count(a => a.EstApprouve),
-                    MoyenneNote = g.Average(a => (double)a.Note)
-                })
-                .FirstOrDefaultAsync();
+            //  STATISTIQUES GLOBALES - CORRIGÉ
+            var totalAvis = await _context.Avis.CountAsync();
 
-            if (statistiques != null)
+            if (totalAvis > 0)
             {
-                TotalAvis = statistiques.Total;
-                AvisEnAttente = statistiques.EnAttente;
-                AvisApprouves = statistiques.Approuves;
-                NoteMoyenneGlobale = statistiques.MoyenneNote;
+                // Il y a des avis, on peut calculer les stats
+                TotalAvis = totalAvis;
+                AvisEnAttente = await _context.Avis.CountAsync(a => !a.EstApprouve);
+                AvisApprouves = await _context.Avis.CountAsync(a => a.EstApprouve);
+                NoteMoyenneGlobale = await _context.Avis.AverageAsync(a => (double)a.Note);
             }
             else
             {
@@ -86,7 +77,7 @@ namespace WebApplication1.Pages.Reviews
         public async Task<IActionResult> OnPostApproveAsync(int id)
         {
             var avis = await _context.Avis.FindAsync(id);
-            
+
             if (avis == null)
             {
                 return NotFound();
@@ -95,13 +86,14 @@ namespace WebApplication1.Pages.Reviews
             avis.EstApprouve = true;
             await _context.SaveChangesAsync();
 
+            TempData["Message"] = "Avis approuvé avec succès !";
             return RedirectToPage();
         }
 
         public async Task<IActionResult> OnPostDeleteAsync(int id)
         {
             var avis = await _context.Avis.FindAsync(id);
-            
+
             if (avis == null)
             {
                 return NotFound();
@@ -110,6 +102,7 @@ namespace WebApplication1.Pages.Reviews
             _context.Avis.Remove(avis);
             await _context.SaveChangesAsync();
 
+            TempData["Message"] = "Avis supprimé avec succès !";
             return RedirectToPage();
         }
     }

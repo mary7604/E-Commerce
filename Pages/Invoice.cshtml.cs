@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+Ôªøusing Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
@@ -21,48 +21,42 @@ namespace WebApplication1.Pages
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            try
-            {
-                // RÈcupÈrer la commande
-                var commande = await _context.Commandes
-                    .Include(c => c.Client)
-                    .FirstOrDefaultAsync(c => c.Id == id);
+            // R√©cup√©rer la commande
+            var commande = await _context.Commandes
+                .Include(c => c.Client)
+                .FirstOrDefaultAsync(c => c.Id == id);
 
-                if (commande == null)
-                {
-                    return NotFound();
-                }
-
-                // VÈrifier que c'est bien le client de la commande
-                var clientIdStr = HttpContext.Session.GetString("ClientId");
-                if (string.IsNullOrEmpty(clientIdStr) || int.Parse(clientIdStr) != commande.ClientId)
-                {
-                    return Unauthorized();
-                }
-
-                // Calculer sous-total et livraison
-                var subtotal = commande.MontantTotal - (commande.MontantTotal >= 550 ? 0 : 50);
-                var shipping = commande.MontantTotal >= 550 ? 0 : 50;
-
-                // GÈnÈrer la facture HTML
-                InvoiceHtml = _invoiceService.GenerateInvoiceHtml(
-                    orderId: commande.Id,
-                    customerName: commande.Client?.Nom ?? "Client",
-                    customerEmail: commande.Client?.Email ?? "",
-                    customerAddress: commande.Client?.Adresse ?? "",
-                    subtotal: subtotal,
-                    shipping: shipping,
-                    total: commande.MontantTotal,
-                    orderDate: commande.DateCommande
-                );
-
-                return Page();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erreur : {ex.Message}");
+            if (commande == null)
                 return NotFound();
+
+            // client connect√© OU commande invit√©e
+            var sessionClientId = HttpContext.Session.GetInt32("ClientId");
+
+            if (commande.ClientId != null)
+            {
+                if (!sessionClientId.HasValue || sessionClientId.Value != commande.ClientId)
+                    return Unauthorized();
             }
+
+            // Calcul livraison & sous-total 
+            var shipping = commande.MontantTotal >= 500 ? 0 : 50;
+            var subtotal = commande.MontantTotal - shipping;
+
+            // G√©n√©rer la facture HTML
+            InvoiceHtml = _invoiceService.GenerateInvoiceHtml(
+                orderId: commande.Id,
+                customerName: commande.Client != null
+                    ? $"{commande.Client.Prenom} {commande.Client.Nom}"
+                    : commande.NomClient,
+                customerEmail: commande.EmailClient,
+                customerAddress: commande.AdresseLivraison,
+                subtotal: subtotal,
+                shipping: shipping,
+                total: commande.MontantTotal,
+                orderDate: commande.DateCommande
+            );
+
+            return Page();
         }
     }
 }

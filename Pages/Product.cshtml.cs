@@ -77,7 +77,6 @@ namespace WebApplication1.Pages
                 return RedirectToPage(new { id });
             }
 
-            // ✅ CRÉER L'AVIS DIRECTEMENT APPROUVÉ
             var avis = new Avis
             {
                 ProduitId = id,
@@ -85,7 +84,7 @@ namespace WebApplication1.Pages
                 Note = Note,
                 Commentaire = Commentaire,
                 DateAvis = DateTime.Now,
-                EstApprouve = true  // ✅ Publié immédiatement
+                EstApprouve = true  
             };
 
             _context.Avis.Add(avis);

@@ -4,7 +4,7 @@ namespace WebApplication1.Services
 {
     public class InvoiceService
     {
-        // Génère une facture HTML (qui peut être convertie en PDF)
+        // Génère une facture HTML
         public string GenerateInvoiceHtml(int orderId, string customerName, string customerEmail,
             string customerAddress, decimal subtotal, decimal shipping, decimal total, DateTime orderDate)
         {

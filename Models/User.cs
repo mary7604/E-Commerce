@@ -25,7 +25,6 @@ namespace WebApplication1.Models
         [Display(Name = "Téléphone")]
         public string? Phone { get; set; }
 
-        // Alias pour PhoneNumber (pour compatibilité)
         [Phone(ErrorMessage = "Format de téléphone invalide")]
         [Display(Name = "Numéro de téléphone")]
         public string? PhoneNumber { get; set; }
