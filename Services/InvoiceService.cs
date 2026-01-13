@@ -1,14 +1,45 @@
 ﻿using System.Text;
+using WebApplication1.Models;
 
 namespace WebApplication1.Services
 {
     public class InvoiceService
     {
-        // Génère une facture HTML
-        public string GenerateInvoiceHtml(int orderId, string customerName, string customerEmail,
-            string customerAddress, decimal subtotal, decimal shipping, decimal total, DateTime orderDate)
+      
+        public string GenerateInvoiceHtml(
+            Commande commande,  //  Passer toute la commande
+            decimal subtotal,
+            decimal shipping)
         {
-            var invoiceNumber = $"FAC-{orderDate:yyyyMM}-{orderId:D6}";
+            var invoiceNumber = $"FAC-{commande.DateCommande:yyyyMM}-{commande.Id:D6}";
+            var total = commande.MontantTotal;
+
+            
+            var productsHtml = new StringBuilder();
+
+            if (commande.LignesCommande != null && commande.LignesCommande.Any())
+            {
+                foreach (var ligne in commande.LignesCommande)
+                {
+                    var lineTotal = ligne.PrixUnitaire * ligne.Quantite;
+                    productsHtml.Append($@"
+                <tr>
+                    <td>{ligne.NomProduit}</td>
+                    <td style='text-align: center;'>{ligne.Quantite}</td>
+                    <td style='text-align: right;'>{ligne.PrixUnitaire:N2} MAD</td>
+                    <td style='text-align: right;'><strong>{lineTotal:N2} MAD</strong></td>
+                </tr>");
+                }
+            }
+            else
+            {
+                productsHtml.Append(@"
+                <tr>
+                    <td colspan='4' style='text-align: center; padding: 40px; color: #6b7280;'>
+                        Aucun produit dans cette commande
+                    </td>
+                </tr>");
+            }
 
             return $@"
 <!DOCTYPE html>
@@ -128,6 +159,21 @@ namespace WebApplication1.Services
             color: #6b7280;
             font-style: italic;
         }}
+        .badge {{
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+        }}
+        .badge-paid {{
+            background: #d1fae5;
+            color: #065f46;
+        }}
+        .badge-pending {{
+            background: #fef3c7;
+            color: #92400e;
+        }}
         @media print {{
             body {{
                 padding: 0;
@@ -143,17 +189,18 @@ namespace WebApplication1.Services
         <!-- Header -->
         <div class='header'>
             <div class='company-info'>
-                <div class='company-name'>🛍️ BOUTIQUE</div>
+                <div class='company-name'>🛍️ MimiBout</div>
                 <p>E-Commerce Solution</p>
                 <p>Casablanca, Maroc</p>
                 <p>Tél: +212 5XX XX XX XX</p>
-                <p>Email: contact@boutique.com</p>
+                <p>Email: contact@mimibout.com</p>
             </div>
             <div class='invoice-info'>
                 <div class='invoice-number'>FACTURE</div>
                 <p><strong>{invoiceNumber}</strong></p>
-                <p>Date: {orderDate:dd/MM/yyyy}</p>
-                <p>Commande: #{orderId:D6}</p>
+                <p>Date: {commande.DateCommande:dd/MM/yyyy}</p>
+                <p>Commande: #{commande.Id:D6}</p>
+                <p><span class='badge {(commande.Statut == "Payée" ? "badge-paid" : "badge-pending")}'>{commande.Statut}</span></p>
             </div>
         </div>
 
@@ -161,15 +208,16 @@ namespace WebApplication1.Services
         <div class='info-section'>
             <div class='info-box'>
                 <h3>Facturé à</h3>
-                <p><strong>{customerName}</strong></p>
-                <p>{customerEmail}</p>
-                <p>{(string.IsNullOrEmpty(customerAddress) ? "Adresse non renseignée" : customerAddress)}</p>
+                <p><strong>{commande.NomClient}</strong></p>
+                <p>{commande.EmailClient}</p>
+                <p>{commande.TelephoneClient}</p>
+                <p>{commande.AdresseLivraison}</p>
             </div>
             <div class='info-box'>
                 <h3>Détails de paiement</h3>
-                <p><strong>Statut:</strong> Payé ✓</p>
-                <p><strong>Mode:</strong> Carte bancaire</p>
-                <p><strong>Date:</strong> {orderDate:dd/MM/yyyy HH:mm}</p>
+                <p><strong>Statut:</strong> {commande.Statut}</p>
+                <p><strong>Mode:</strong> {(string.IsNullOrEmpty(commande.ModePaiement) ? "Non spécifié" : commande.ModePaiement)}</p>
+                <p><strong>Date:</strong> {commande.DateCommande:dd/MM/yyyy HH:mm}</p>
             </div>
         </div>
 
@@ -184,11 +232,7 @@ namespace WebApplication1.Services
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td colspan='4' style='text-align: center; padding: 40px; color: #6b7280;'>
-                        Détails des articles à récupérer depuis le panier
-                    </td>
-                </tr>
+                {productsHtml}
             </tbody>
         </table>
 
@@ -200,7 +244,7 @@ namespace WebApplication1.Services
             </div>
             <div class='totals-row'>
                 <span>Livraison:</span>
-                <strong>{(shipping == 0 ? "Gratuite" : $"{shipping:N2} MAD")}</strong>
+                <strong>{(shipping == 0 ? "Gratuite " : $"{shipping:N2} MAD")}</strong>
             </div>
             <div class='totals-row total'>
                 <span>TOTAL TTC:</span>
@@ -213,29 +257,24 @@ namespace WebApplication1.Services
         <!-- Stamp -->
         <div class='stamp'>
             <p>Document généré automatiquement le {DateTime.Now:dd/MM/yyyy à HH:mm}</p>
-            <p>Signature électronique validée</p>
+            <p>Signature électronique validée ✓</p>
         </div>
 
         <!-- Footer -->
         <div class='footer'>
-            <p><strong>Conditions de paiement:</strong> Paiement comptant</p>
+            <p><strong>Conditions de paiement:</strong> {(commande.ModePaiement == "Paiement à la livraison" ? "Paiement à la livraison" : "Paiement comptant")}</p>
             <p><strong>Conditions de livraison:</strong> Livraison sous 2-3 jours ouvrés</p>
             <p style='margin-top: 20px;'>
                 Merci pour votre confiance !<br>
-                Pour toute question, contactez-nous à support@boutique.com
+                Pour toute question, contactez-nous à support@mimibout.com
             </p>
             <p style='margin-top: 20px; font-size: 10px;'>
-                Boutique E-Commerce - SARL au capital de 100 000 MAD<br>
+                MimiBout - SARL au capital de 100 000 MAD<br>
                 RC: Casablanca 123456 - IF: 12345678 - ICE: 000123456789012<br>
                 Siège social: 123 Boulevard Mohammed V, Casablanca, Maroc
             </p>
         </div>
     </div>
-
-    <script>
-        // Auto-print option
-        // window.print();
-    </script>
 </body>
 </html>";
         }
@@ -258,7 +297,7 @@ namespace WebApplication1.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors de la sauvegarde de la facture : {ex.Message}");
+                Console.WriteLine($" Erreur lors de la sauvegarde de la facture : {ex.Message}");
                 return string.Empty;
             }
         }

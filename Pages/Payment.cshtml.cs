@@ -39,7 +39,6 @@ namespace WebApplication1.Pages
 
             Commande = commande;
             CalculateTotals();
-
             return Page();
         }
 
@@ -54,23 +53,27 @@ namespace WebApplication1.Pages
                 return NotFound();
             }
 
-            // Mettre à jour le mode de paiement
-            commande.ModePaiement = PaymentMethod switch
+            switch (PaymentMethod)
             {
-                "carte" => "Carte bancaire",
-                "especes" => "Paiement à la livraison",
-                "virement" => "Virement bancaire",
-                _ => "Non spécifié"
-            };
+                case "carte":
+                    commande.ModePaiement = "Carte bancaire";
+                    commande.Statut = "Payée";  //  Paiement immédiat
+                    break;
 
-            // Mettre à jour le statut
-            if (PaymentMethod == "carte" || PaymentMethod == "virement")
-            {
-                commande.Statut = "Payée";
-            }
-            else
-            {
-                commande.Statut = "En attente de paiement";
+                case "virement":
+                    commande.ModePaiement = "Virement bancaire";
+                    commande.Statut = "En attente de virement";  //  Attente du virement
+                    break;
+
+                case "especes":
+                    commande.ModePaiement = "Paiement à la livraison";
+                    commande.Statut = "En attente de paiement";  // Paiement à la livraison
+                    break;
+
+                default:
+                    commande.ModePaiement = "Non spécifié";
+                    commande.Statut = "En attente";
+                    break;
             }
 
             await _context.SaveChangesAsync();
@@ -90,17 +93,29 @@ namespace WebApplication1.Pages
                         commande.MontantTotal
                     );
 
-                    TempData["Message"] = "Paiement confirmé ! Un email de confirmation a été envoyé à " + clientEmail;
+                    // Message adapté selon le mode de paiement
+                    if (PaymentMethod == "carte")
+                    {
+                        TempData["Message"] = " Paiement confirmé ! Un email de confirmation a été envoyé à " + clientEmail;
+                    }
+                    else if (PaymentMethod == "especes")
+                    {
+                        TempData["Message"] = " Commande enregistrée ! Vous paierez à la livraison. Email envoyé à " + clientEmail;
+                    }
+                    else
+                    {
+                        TempData["Message"] = " Commande enregistrée ! Veuillez effectuer le virement. Email envoyé à " + clientEmail;
+                    }
                 }
                 else
                 {
-                    TempData["Message"] = "Paiement confirmé !";
+                    TempData["Message"] = " Commande enregistrée !";
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur envoi email: {ex.Message}");
-                TempData["Message"] = "Paiement confirmé !";
+                Console.WriteLine($" Erreur envoi email: {ex.Message}");
+                TempData["Message"] = " Commande enregistrée !";
             }
 
             // Rediriger vers la facture

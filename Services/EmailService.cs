@@ -16,8 +16,8 @@ namespace WebApplication1.Services
         {
             try
             {
-                // Configuration SMTP (à personnaliser)
-                var fromEmail = _configuration["Email:FromEmail"] ?? "noreply@boutique.com";
+                // Configuration SMTP 
+                var fromEmail = _configuration["Email:FromEmail"] ?? "MimiBout@boutique.com";
                 var smtpHost = _configuration["Email:SmtpHost"] ?? "smtp.gmail.com";
                 var smtpPort = int.Parse(_configuration["Email:SmtpPort"] ?? "587");
                 var smtpUser = _configuration["Email:SmtpUser"] ?? "";
@@ -26,7 +26,7 @@ namespace WebApplication1.Services
                 // Si pas de configuration SMTP, simuler l'envoi
                 if (string.IsNullOrEmpty(smtpUser))
                 {
-                    Console.WriteLine($"📧 EMAIL SIMULÉ envoyé à {toEmail}");
+                    Console.WriteLine($" EMAIL SIMULÉ envoyé à {toEmail}");
                     Console.WriteLine($"Commande #{orderId} - Montant: {total:N2} MAD");
                     return;
                 }
@@ -51,11 +51,11 @@ namespace WebApplication1.Services
 
                 // Envoyer l'email
                 await smtpClient.SendMailAsync(mailMessage);
-                Console.WriteLine($"✅ Email envoyé avec succès à {toEmail}");
+                Console.WriteLine($" Email envoyé avec succès à {toEmail}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur lors de l'envoi de l'email : {ex.Message}");
+                Console.WriteLine($" Erreur lors de l'envoi de l'email : {ex.Message}");
                 // Ne pas bloquer la commande si l'email échoue
             }
         }
@@ -164,10 +164,10 @@ namespace WebApplication1.Services
             
             <p><strong>Que se passe-t-il ensuite ?</strong></p>
             <ul style='line-height: 1.8;'>
-                <li>✅ Votre commande est confirmée</li>
-                <li>📦 Préparation de votre colis sous 24h</li>
-                <li>🚚 Expédition sous 2-3 jours ouvrés</li>
-                <li>📧 Vous recevrez un email avec le numéro de suivi</li>
+                <li>Votre commande est confirmée</li>
+                <li> Préparation de votre colis sous 24h</li>
+                <li> Expédition sous 2-3 jours ouvrés</li>
+                <li> Vous recevrez un email avec le numéro de suivi</li>
             </ul>
             
             <div style='text-align: center;'>
@@ -184,7 +184,7 @@ namespace WebApplication1.Services
         
         <div class='footer'>
             <p>© 2024 Boutique E-Commerce. Tous droits réservés.</p>
-            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre :).</p>
         </div>
     </div>
 </body>

@@ -1,19 +1,21 @@
-using Microsoft.AspNetCore.Mvc;
+Ôªøusing Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using WebApplication1.Data;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Pages
 {
     public class CheckoutModel : PageModel
     {
         private readonly ApplicationDbContext _context;
+        private readonly CartService _cartService;
 
-        public CheckoutModel(ApplicationDbContext context)
+        public CheckoutModel(ApplicationDbContext context, CartService cartService)
         {
             _context = context;
+            _cartService = cartService;
         }
 
         [BindProperty]
@@ -33,35 +35,57 @@ namespace WebApplication1.Pages
         public decimal ShippingCost { get; set; }
         public decimal Total { get; set; }
 
-        public void OnGet()
+        public async Task<IActionResult> OnGetAsync()
         {
-            LoadCart();
-            
-            // PrÈ-remplir avec les infos du client connectÈ si disponible
+            //  V√âRIFIER SI LE CLIENT EST CONNECT√â
             var clientId = HttpContext.Session.GetInt32("ClientId");
-            if (clientId.HasValue)
+
+            if (!clientId.HasValue)
             {
-                var client = _context.Clients.Find(clientId.Value);
-                if (client != null)
-                {
-                    NomClient = $"{client.Prenom} {client.Nom}";
-                    EmailClient = client.Email;
-                    TelephoneClient = client.Telephone ?? "";
-                    AdresseLivraison = client.Adresse ?? "";
-                }
+                // Client NON connect√© = Redirection vers Login
+                TempData["Error"] = " Vous devez vous connecter pour passer commande";
+                TempData["ReturnUrl"] = "/Checkout";  // Pour revenir apr√®s connexion
+                return RedirectToPage("/Account/Login");
             }
+
+            //  Client connect√© ‚Üí Charger ses informations
+            var client = await _context.Clients.FindAsync(clientId.Value);
+
+            if (client != null)
+            {
+                // PR√â-REMPLIR le formulaire automatiquement
+                NomClient = $"{client.Prenom} {client.Nom}";
+                EmailClient = client.Email;
+                TelephoneClient = client.Telephone ?? "";
+                AdresseLivraison = client.Adresse ?? "";
+
+                Console.WriteLine($" Formulaire pr√©-rempli pour : {NomClient}");
+            }
+
+            await LoadCartAsync();
+            return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
+            //  DOUBLE V√âRIFICATION : Client toujours connect√© ?
+            var clientId = HttpContext.Session.GetInt32("ClientId");
+
+            if (!clientId.HasValue)
+            {
+                TempData["Error"] = " Session expir√©e. Veuillez vous reconnecter.";
+                return RedirectToPage("/Account/Login");
+            }
+
             if (!ModelState.IsValid)
             {
-                LoadCart();
+                await LoadCartAsync();
                 return Page();
             }
 
-            // RÈcupÈrer le panier
-            var cart = GetCartFromSessionOrCookie();
+            //  R√©cup√©rer le panier depuis Redis
+            string userId = GetUserId();
+            var cart = await _cartService.GetCartAsync(userId);
 
             if (cart.Count == 0)
             {
@@ -69,16 +93,13 @@ namespace WebApplication1.Pages
                 return RedirectToPage("/Index");
             }
 
-            // VÈrifier le stock avant de crÈer la commande
-            foreach (var item in cart)
+            // Valider le stock avant de cr√©er la commande
+            var validation = await _cartService.ValidateCartStockAsync(userId);
+            if (!validation.IsValid)
             {
-                var produit = await _context.Produits.FindAsync(item.ProduitId);
-                if (produit == null || produit.Stock < item.Quantite)
-                {
-                    TempData["Error"] = $"Stock insuffisant pour {item.Nom}";
-                    LoadCart();
-                    return Page();
-                }
+                TempData["Error"] = string.Join("<br>", validation.Errors);
+                await LoadCartAsync();
+                return Page();
             }
 
             // Calculer les totaux
@@ -86,13 +107,10 @@ namespace WebApplication1.Pages
             var shippingCost = subtotal >= 500 ? 0 : 50;
             var total = subtotal + shippingCost;
 
-            // RÈcupÈrer l'ID du client connectÈ
-            var clientId = HttpContext.Session.GetInt32("ClientId");
-
-            // CrÈer la commande
+            //  Cr√©er la commande (ClientId toujours rempli)
             var commande = new Commande
             {
-                ClientId = clientId,  
+                ClientId = clientId.Value,  //  Toujours rempli maintenant
                 NomClient = NomClient,
                 EmailClient = EmailClient,
                 TelephoneClient = TelephoneClient,
@@ -110,7 +128,7 @@ namespace WebApplication1.Pages
 
             _context.Commandes.Add(commande);
 
-            // DÈcrÈmenter le stock
+            // D√©cr√©menter le stock
             foreach (var item in cart)
             {
                 var produit = await _context.Produits.FindAsync(item.ProduitId);
@@ -122,51 +140,54 @@ namespace WebApplication1.Pages
 
             await _context.SaveChangesAsync();
 
-            // Vider le panier
-            ClearCart();
+            //  Vider le panier dans Redis
+            await _cartService.ClearCartAsync(userId);
 
             // Rediriger vers la page de paiement
-            TempData["Message"] = "Commande crÈÈe avec succËs ! ProcÈdez au paiement.";
+            TempData["Message"] = " Commande cr√©√©e avec succ√®s ! Proc√©dez au paiement.";
             return RedirectToPage("/Payment", new { id = commande.Id });
         }
 
-        private void LoadCart()
+        private async Task LoadCartAsync()
         {
-            var cart = GetCartFromSessionOrCookie();
+            string userId = GetUserId();
+            var cart = await _cartService.GetCartAsync(userId);
+
             CartItems = cart;
             Subtotal = cart.Sum(item => item.Prix * item.Quantite);
             ShippingCost = Subtotal >= 500 ? 0 : 50;
             Total = Subtotal + ShippingCost;
         }
 
-        private List<CartItem> GetCartFromSessionOrCookie()
+        private string GetUserId()
         {
-            var cartJson = HttpContext.Session.GetString("Cart");
-            
-            if (string.IsNullOrEmpty(cartJson))
+           
+
+            // Utilisateur connect√©
+            if (User.Identity?.IsAuthenticated == true)
             {
-                cartJson = Request.Cookies["Cart"];
+                return User.Identity.Name ?? "guest";
             }
 
-            if (string.IsNullOrEmpty(cartJson))
+            // visiteur Cookie
+            string? userId = Request.Cookies["GuestCartId"];
+
+            if (string.IsNullOrEmpty(userId))
             {
-                return new List<CartItem>();
+                userId = $"guest_{Guid.NewGuid()}";
+
+                var cookieOptions = new CookieOptions
+                {
+                    Expires = DateTimeOffset.UtcNow.AddDays(30),
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Lax,
+                    IsEssential = true
+                };
+
+                Response.Cookies.Append("GuestCartId", userId, cookieOptions);
             }
 
-            try
-            {
-                return JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
-            }
-            catch
-            {
-                return new List<CartItem>();
-            }
-        }
-
-        private void ClearCart()
-        {
-            HttpContext.Session.Remove("Cart");
-            Response.Cookies.Delete("Cart");
+            return userId;
         }
     }
 }

@@ -1,0 +1,16 @@
+﻿@page
+@model WebApplication1.Pages.TestRedisModel
+@{
+    ViewData["Title"] = "Test Redis";
+}
+
+<h1>Test Redis</h1>
+
+<div style="padding: 20px; background: #e8f5e9; border-radius: 5px;">
+    <h3>✅ Résultat du cache Redis :</h3>
+    <pre>@Model.Message</pre>
+</div>
+
+<p style="margin-top: 20px;">
+    <a href="/TestRedis">🔄 Recharger la page</a>
+</p> 

@@ -4,7 +4,7 @@ using WebApplication1.Services;
 namespace WebApplication1.Controllers
 {
     [ApiController]
-    [Route("api/chat")]
+    [Route("api/[controller]")]
     public class ChatController : ControllerBase
     {
         private readonly ChatbotService _chatbotService;
@@ -17,13 +17,12 @@ namespace WebApplication1.Controllers
         [HttpPost]
         public async Task<IActionResult> Post([FromBody] ChatRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.Message))
-            {
+            if (string.IsNullOrWhiteSpace(request.Message))
                 return BadRequest(new { error = "Message vide" });
-            }
 
             var response = await _chatbotService.GetChatResponseAsync(request.Message);
-            return Ok(new { response });
+
+            return Ok(response);
         }
     }
 

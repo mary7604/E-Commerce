@@ -2,9 +2,9 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
 using WebApplication1.Data;
 using WebApplication1.Models;
+using WebApplication1.Services;
 
 namespace WebApplication1.Pages
 {
@@ -12,167 +12,190 @@ namespace WebApplication1.Pages
     {
         private readonly ApplicationDbContext _context;
         private readonly IMemoryCache _cache;
+        private readonly CartService _cartService;
 
-        public IndexModel(ApplicationDbContext context, IMemoryCache cache)
+        public IndexModel(ApplicationDbContext context, IMemoryCache cache, CartService cartService)
         {
             _context = context;
             _cache = cache;
+            _cartService = cartService;
         }
 
         public List<Produit> Produits { get; set; } = new List<Produit>();
+        public List<string> Categories { get; set; } = new List<string>();
+
         public string? SearchTerm { get; set; }
+        public List<string>? SelectedCategories { get; set; }
+        public decimal? MinPrix { get; set; }
+        public decimal? MaxPrix { get; set; }
+
         public int CartCount { get; set; }
 
-        public async Task OnGetAsync(string? search)
+        public async Task OnGetAsync(
+            string? search,
+            List<string>? categories = null,
+            decimal? minPrix = null,
+            decimal? maxPrix = null)
         {
             SearchTerm = search;
+            SelectedCategories = categories;
+            MinPrix = minPrix;
+            MaxPrix = maxPrix;
 
-            // Si recherche pas du cache
-            if (!string.IsNullOrWhiteSpace(search))
+            Categories = await GetCategoriesFromCache();
+
+            bool hasFilters = !string.IsNullOrWhiteSpace(search) ||
+                              (categories != null && categories.Any()) ||
+                              minPrix.HasValue ||
+                              maxPrix.HasValue;
+
+            if (hasFilters)
             {
-                var query = _context.Produits
-                    .Where(p => p.Nom.Contains(search) ||
-                               (p.Description != null && p.Description.Contains(search)));
-
-                Produits = await query
-                    .OrderByDescending(p => p.Stock)
-                    .ToListAsync();
+                Produits = await GetFilteredProduitsAsync(search, categories, minPrix, maxPrix);
             }
             else
             {
-                // Pas de recherche == UTILISER LE CACHE
                 Produits = await GetProduitsFromCache();
             }
 
-            // Calculer le nombre d'articles dans le panier
-            CartCount = GetCartCount();
+            CartCount = await GetCartCountAsync();
         }
 
-        //  NOUVELLE MÉTHODE AVEC CACHE
         private async Task<List<Produit>> GetProduitsFromCache()
         {
             const string cacheKey = "produits_liste";
 
-            // Essayer de lire depuis le cache
             if (!_cache.TryGetValue(cacheKey, out List<Produit> produits))
             {
-                // Cache MISS alors Requête BDD
-                Console.WriteLine(" CACHE MISS - Requête BDD");
-
                 produits = await _context.Produits
-                    .OrderByDescending(p => p.Stock)
+                    .AsNoTracking()
+                    .Where(p => p.Stock > 0)
+                    .OrderByDescending(p => p.DateAjout)
                     .ToListAsync();
 
-                // Mettre en cache pour 5 min
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-
-                _cache.Set(cacheKey, produits, cacheOptions);
-            }
-            else
-            {
-                // Lecture cache
-                Console.WriteLine("CACHE HIT - Depuis cache");
+                _cache.Set(cacheKey, produits, TimeSpan.FromMinutes(5));
             }
 
             return produits;
+        }
+
+        private async Task<List<Produit>> GetFilteredProduitsAsync(
+            string? search, List<string>? categories, decimal? minPrix, decimal? maxPrix)
+        {
+            var query = _context.Produits.AsNoTracking();
+          
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(p => p.Nom.Contains(search) || (p.Description != null && p.Description.Contains(search)));
+
+            if (categories != null && categories.Any())
+                query = query.Where(p => !string.IsNullOrEmpty(p.Categorie) && categories.Contains(p.Categorie));
+
+            if (minPrix.HasValue && minPrix.Value > 0)
+                query = query.Where(p => p.Prix >= minPrix.Value);
+
+            if (maxPrix.HasValue && maxPrix.Value < 5000)
+                query = query.Where(p => p.Prix <= maxPrix.Value);
+
+            return await query.OrderByDescending(p => p.DateAjout).ToListAsync();
+        }
+
+        private async Task<List<string>> GetCategoriesFromCache()
+        {
+            const string cacheKey = "categories_liste";
+
+            if (!_cache.TryGetValue(cacheKey, out List<string> categories))
+            {
+                categories = await _context.Produits
+                     .AsNoTracking()
+                    .Where(p => !string.IsNullOrEmpty(p.Categorie))
+                    .Select(p => p.Categorie!)
+                    .Distinct()
+                    .OrderBy(c => c)
+                    .ToListAsync();
+
+                _cache.Set(cacheKey, categories, TimeSpan.FromMinutes(10));
+            }
+
+            return categories;
         }
 
         public async Task<IActionResult> OnPostAddToCartAsync(int id)
         {
             var produit = await _context.Produits.FindAsync(id);
 
-            if (produit == null || produit.Stock == 0)
+            if (produit == null)
             {
+                TempData["Error"] = " Produit introuvable";
                 return RedirectToPage();
             }
 
-            var cart = GetCartFromSessionOrCookie();
-
-            var existingItem = cart.FirstOrDefault(item => item.ProduitId == id);
-
-            if (existingItem != null)
+            if (produit.Stock == 0)
             {
-                if (existingItem.Quantite < produit.Stock)
-                {
-                    existingItem.Quantite++;
-                }
+                TempData["Error"] = $" '{produit.Nom}' est en rupture de stock";
+                return RedirectToPage();
             }
+
+            string userId = GetUserId();
+
+            var item = new CartItem
+            {
+                ProduitId = produit.Id,
+                Nom = produit.Nom,
+                Prix = produit.Prix,
+                Quantite = 1,
+                ImageUrl = produit.ImageUrl
+            };
+
+            var result = await _cartService.AddToCartAsync(userId, item);
+
+            if (result.Success)
+                TempData["Message"] = result.Message;
             else
-            {
-                cart.Add(new CartItem
-                {
-                    ProduitId = produit.Id,
-                    Nom = produit.Nom,
-                    Prix = produit.Prix,
-                    Quantite = 1,
-                    ImageUrl = produit.ImageUrl
-                });
-            }
+                TempData["Error"] = result.Message;
 
-            SaveCartToSessionAndCookie(cart);
-
-            TempData["Message"] = "Produit ajouté au panier !";
             return RedirectToPage();
         }
 
-        private List<CartItem> GetCartFromSessionOrCookie()
+        private async Task<int> GetCartCountAsync()
         {
-            // Essayer de lire depuis la session
-            var cartJson = HttpContext.Session.GetString("Cart");
-
-            // Si pas dans session, essayer depuis les cookies
-            if (string.IsNullOrEmpty(cartJson))
-            {
-                cartJson = Request.Cookies["Cart"];
-            }
-
-            if (string.IsNullOrEmpty(cartJson))
-            {
-                return new List<CartItem>();
-            }
-
-            try
-            {
-                return JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
-            }
-            catch
-            {
-                return new List<CartItem>();
-            }
+            return await _cartService.GetCartCountAsync(GetUserId());
         }
 
-        private void SaveCartToSessionAndCookie(List<CartItem> cart)
+        private string GetUserId()
         {
-            var cartJson = JsonSerializer.Serialize(cart);
-
-            // Sauvegarder dans la session
-            HttpContext.Session.SetString("Cart", cartJson);
-
-            // Sauvegarder aussi dans un cookie persistant (30 jrs)
-            Response.Cookies.Append("Cart", cartJson, new CookieOptions
+            //  Utilisateur connecté
+            if (User.Identity?.IsAuthenticated == true)
             {
-                Expires = DateTimeOffset.Now.AddDays(30),
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict
-            });
-        }
+                return User.Identity.Name ?? "guest";
+            }
 
-        private int GetCartCount()
+            // Visiteur non connecté = Cookie permanent (30 jours)
+            string? userId = Request.Cookies["GuestCartId"];
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                // Créer un nouvel ID unique
+                userId = $"guest_{Guid.NewGuid()}";
+
+                // Stocker dans un cookie permanent
+                var cookieOptions = new CookieOptions
+                {
+                    Expires = DateTimeOffset.UtcNow.AddDays(30),
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Lax,
+                    IsEssential = true
+                };
+
+                Response.Cookies.Append("GuestCartId", userId, cookieOptions);
+            }
+
+            return userId;
+        }
+        public async Task<IActionResult> OnGetCartCountAsync()
         {
-            var cart = GetCartFromSessionOrCookie();
-            return cart.Sum(item => item.Quantite);
+            var count = await GetCartCountAsync();
+            return new JsonResult(new { count });
         }
-    }
-
-    // Classe CartItem 
-    public class CartItem
-    {
-        public int ProduitId { get; set; }
-        public string Nom { get; set; } = string.Empty;
-        public decimal Prix { get; set; }
-        public int Quantite { get; set; }
-        public string? ImageUrl { get; set; }
     }
 }

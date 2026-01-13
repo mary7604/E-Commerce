@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.Models;
 using WebApplication1.Services;
 
 namespace WebApplication1.Pages
@@ -18,42 +19,40 @@ namespace WebApplication1.Pages
         }
 
         public string InvoiceHtml { get; set; } = string.Empty;
+        public Commande Commande { get; set; } = null!;
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            // Récupérer la commande
             var commande = await _context.Commandes
-                .Include(c => c.Client)
+                .Include(c => c.LignesCommande)  // Charger les produits
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (commande == null)
-                return NotFound();
-
-            // client connecté OU commande invitée
-            var sessionClientId = HttpContext.Session.GetInt32("ClientId");
-
-            if (commande.ClientId != null)
             {
-                if (!sessionClientId.HasValue || sessionClientId.Value != commande.ClientId)
-                    return Unauthorized();
+                return NotFound();
             }
 
-            // Calcul livraison & sous-total 
-            var shipping = commande.MontantTotal >= 500 ? 0 : 50;
-            var subtotal = commande.MontantTotal - shipping;
+            Commande = commande;
 
-            // Générer la facture HTML
+            decimal total = commande.MontantTotal;
+            decimal subtotal;
+            decimal shipping;
+
+            if (total >= 550)
+            {
+                subtotal = total;
+                shipping = 0;
+            }
+            else
+            {
+                subtotal = total - 50;
+                shipping = 50;
+            }
+
             InvoiceHtml = _invoiceService.GenerateInvoiceHtml(
-                orderId: commande.Id,
-                customerName: commande.Client != null
-                    ? $"{commande.Client.Prenom} {commande.Client.Nom}"
-                    : commande.NomClient,
-                customerEmail: commande.EmailClient,
-                customerAddress: commande.AdresseLivraison,
-                subtotal: subtotal,
-                shipping: shipping,
-                total: commande.MontantTotal,
-                orderDate: commande.DateCommande
+                commande,    
+                subtotal,
+                shipping
             );
 
             return Page();

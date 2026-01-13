@@ -441,7 +441,7 @@
         .product-image {
             width: 100%;
             height: 100%;
-            object-fit: contain;
+            object-fit: cover;
             padding: 1.25rem;
             transition: transform 0.4s;
         }
@@ -822,6 +822,100 @@
                 right: 15px;
             }
         }
+
+        .filter-sidebar {
+            background: white;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+            position: sticky;
+            top: 100px;
+              margin-left: 15px;
+        }
+        /* Container sans padding à gauche */
+        .products-container-full {
+            padding-left: 0 !important;
+            margin-left: 0 !important;
+        }
+
+            .products-container-full .row {
+                margin-left: 0 !important;
+            }
+
+            .products-container-full .col-lg-3 {
+                padding-left: 0 !important;
+            }
+        /* Sliders */
+        .form-range {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 8px;
+            background: #e2e8f0; /* Barre grise par défaut */
+            outline: none;
+            cursor: pointer;
+            margin: 0.75rem 0;
+        }
+
+            /* Curseur Chrome/Safari - BLEU FONCÉ */
+            .form-range::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                background: var(--primary); /* Bleu foncé */
+                border: 3px solid white;
+                box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+                .form-range::-webkit-slider-thumb:hover {
+                    transform: scale(1.2);
+                    box-shadow: 0 6px 16px rgba(30, 41, 59, 0.5);
+                }
+
+            /* Curseur Firefox - BLEU FONCÉ */
+            .form-range::-moz-range-thumb {
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                background: var(--primary); /* Bleu foncé */
+                border: 3px solid white;
+                box-shadow: 0 4px 12px rgba(30, 41, 59, 0.4);
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+                .form-range::-moz-range-thumb:hover {
+                    transform: scale(1.2);
+                    box-shadow: 0 6px 16px rgba(30, 41, 59, 0.5);
+                }
+
+            /* Track Firefox */
+            .form-range::-moz-range-track {
+                background: #e2e8f0;
+                border-radius: 8px;
+                height: 8px;
+            }
+
+        /* Améliorer l'affichage des valeurs en bleu */
+        #minPriceLabel, #maxPriceLabel {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.875rem;
+            box-shadow: 0 2px 8px rgba(30, 41, 59, 0.25);
+            min-width: 80px;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
@@ -940,110 +1034,204 @@
     </div>
 
     <!-- Products Section -->
-    <div class="container mb-5">
-        <h2 class="section-title">
-            <i  style="color: var(--warning); margin-right: 0.5rem;"></i>
-            Produits Vedettes
-        </h2>
+    <!-- Filters Section -->
+    <div class="container-fluid mb-4" style="padding-left: 0;">
+        <div class="row" style="margin-left: 0;">
 
-        @if (TempData["Message"] != null)
-        {
-            <div class="alert alert-success alert-dismissible fade show">
-                <i class="bi bi-check-circle"></i> @TempData["Message"]
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        }
+            <!-- Sidebar Filtres -->
+            <div class="col-lg-3 mb-3">
+                <div class="card p-3 shadow-sm">
 
-        @if (Model.Produits.Any())
-        {
-            <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-4">
-                @foreach (var produit in Model.Produits)
-                {
-                    <div class="col">
-                        <div class="product-card">
-                            <div class="product-image-container">
-                                @if (produit.Stock > 10)
-                                {
-                                    <span class="badge-stock">En stock</span>
-                                }
-                                else if (produit.Stock > 0)
-                                {
-                                    <span class="badge-stock low">Stock limité</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-stock out">Épuisé</span>
-                                }
+                    <h5 class="fw-bold mb-3">Filtres</h5>
 
-                                @if (!string.IsNullOrEmpty(produit.ImageUrl))
-                                {
-                                    <img src="@produit.ImageUrl" class="product-image" alt="@produit.Nom" />
-                                }
-                                else
-                                {
-                                    <div class="product-placeholder">
-                                        <i class="bi bi-box"></i>
-                                    </div>
-                                }
-                            </div>
-                            <div class="product-body">
-                                <h3 class="product-title">@produit.Nom</h3>
-                                <div class="product-price">@produit.Prix.ToString("N2") MAD</div>
+                    <form method="get">
 
-                                @if (produit.Stock > 10)
-                                {
-                                    <p class="product-stock in-stock">
-                                        <i class="bi bi-check-circle"></i> Disponible
-                                    </p>
-                                }
-                                else if (produit.Stock > 0)
-                                {
-                                    <p class="product-stock low-stock">
-                                        <i class="bi bi-exclamation-triangle"></i> Plus que @produit.Stock en stock
-                                    </p>
-                                }
-                                else
-                                {
-                                    <p class="product-stock out-of-stock">
-                                        <i class="bi bi-x-circle"></i> Rupture de stock
-                                    </p>
-                                }
+                        <!-- Prix -->
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold"> Prix min (MAD)</label>
+                            <span id="minPriceLabel" class="ms-2">
+                                @(Model.MinPrix ?? 0)
+                            </span>
 
-                                <a href="/Product/@produit.Id" class="btn-details">
-                                    <i class="bi bi-eye"></i> Détails & Avis
-                                </a>
+                            <input type="range"
+                                   class="form-range"
+                                   id="minPriceSlider"
+                                   name="minPrix"
+                                   min="0" max="5000" step="10"
+                                   value="@(Model.MinPrix ?? 0)">
 
-                                @if (produit.Stock > 0)
-                                {
-                                    <form method="post" asp-page-handler="AddToCart" asp-route-id="@produit.Id">
-                                        <button type="submit" class="btn-add">
-                                            <i class="bi bi-cart-plus"></i> Ajouter au panier
-                                        </button>
-                                    </form>
-                                }
-                                else
-                                {
-                                    <button class="btn-add" disabled>
-                                        <i class="bi bi-x-circle"></i> Indisponible
-                                    </button>
-                                }
-                            </div>
+                            <label class="form-label fw-semibold mt-3">  Prix max (MAD)</label>
+                            <span id="maxPriceLabel" class="ms-2">
+                                @(Model.MaxPrix ?? 50000)
+                            </span>
+
+                            <input type="range"
+                                   class="form-range"
+                                   id="maxPriceSlider"
+                                   name="maxPrix"
+                                   min="0" max="50000" step="10"
+                                   value="@(Model.MaxPrix ?? 50000)">
                         </div>
+
+                        <!-- Catégories -->
+                        <div>
+                            <h6 class="fw-semibold mb-3">Catégories</h6>
+
+                            @foreach (var cat in Model.Categories)
+                            {
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           name="categories"
+                                           value="@cat"
+                                           id="cat-@cat.Replace(" ", "-")"
+                                    @(Model.SelectedCategories?.Contains(cat) == true ? "checked" : "") />
+
+                                    <label class="form-check-label"
+                                           for="cat-@cat.Replace(" ", "-")">
+                                        @cat
+                                    </label>
+                                </div>
+                            }
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-3 w-100">
+                            Appliquer les filtres
+                        </button>
+
+                    </form>
+
+                    <a href="?" class="btn btn-outline-secondary mt-2 w-100">
+                        🔄 Réinitialiser
+                    </a>
+
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div class="col-lg-9">
+
+                <h2 class="section-title">
+                    Produits Vedettes
+                </h2>
+
+                @if (TempData["Message"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show">
+                        <i class="bi bi-check-circle"></i> @TempData["Message"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 }
-            </div>
 
-            <div class="text-center mt-5">
-                <p class="text-muted">@Model.Produits.Count produit(s) disponible(s)</p>
+                @if (Model.Produits.Any())
+                {
+                    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-4">
+
+                        @foreach (var produit in Model.Produits)
+                        {
+                            <div class="col">
+                                <div class="product-card">
+
+                                    <!-- Image + Badge -->
+                                    <div class="product-image-container">
+                                        @if (produit.Stock > 10)
+                                        {
+                                            <span class="badge-stock">En stock</span>
+                                        }
+                                        else if (produit.Stock > 0)
+                                        {
+                                            <span class="badge-stock low">Stock limité</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge-stock out">Épuisé</span>
+                                        }
+
+                                        @if (!string.IsNullOrEmpty(produit.ImageUrl))
+                                        {
+                                            <img src="@produit.ImageUrl"
+                                                 class="product-image"
+                                                 alt="@produit.Nom"
+                                                 onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=400';" />
+                                        }
+                                        else
+                                        {
+                                            <div class="product-placeholder">
+                                                <i class="bi bi-box"></i>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <!-- Corps -->
+                                    <div class="product-body">
+
+                                        <h3 class="product-title">@produit.Nom</h3>
+
+                                        <div class="product-price">
+                                            @produit.Prix.ToString("N2") MAD
+                                        </div>
+
+                                        @if (produit.Stock > 10)
+                                        {
+                                            <p class="product-stock in-stock">
+                                                <i class="bi bi-check-circle"></i> Disponible
+                                            </p>
+                                        }
+                                        else if (produit.Stock > 0)
+                                        {
+                                            <p class="product-stock low-stock">
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                                Plus que @produit.Stock en stock
+                                            </p>
+                                        }
+                                        else
+                                        {
+                                            <p class="product-stock out-of-stock">
+                                                <i class="bi bi-x-circle"></i> Rupture de stock
+                                            </p>
+                                        }
+
+                                        <a href="/Product/@produit.Id" class="btn-details">
+                                            <i class="bi bi-eye"></i> Détails & Avis
+                                        </a>
+
+                                        @if (produit.Stock > 0)
+                                        {
+                                            <form method="post"
+                                                  asp-page-handler="AddToCart"
+                                                  asp-route-id="@produit.Id">
+                                                <button type="submit" class="btn-add">
+                                                    <i class="bi bi-cart-plus"></i> Ajouter au panier
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-add" disabled>
+                                                <i class="bi bi-x-circle"></i> Indisponible
+                                            </button>
+                                        }
+                                    </div>
+
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="text-center mt-5">
+                        <p class="text-muted">@Model.Produits.Count produit(s) disponible(s)</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 5rem; color: #cbd5e1;"></i>
+                        <p class="text-muted mt-3 fs-5">Aucun produit trouvé</p>
+                    </div>
+                }
+
             </div>
-        }
-        else
-        {
-            <div class="text-center py-5">
-                <i class="bi bi-inbox" style="font-size: 5rem; color: #cbd5e1;"></i>
-                <p class="text-muted mt-3 fs-5">Aucun produit trouvé</p>
-            </div>
-        }
+        </div>
     </div>
 
     <!-- Chatbot Button -->
@@ -1124,6 +1312,7 @@
             const text = input.value.trim();
             if (!text) return;
 
+            // Afficher message utilisateur
             const userMsg = document.createElement('div');
             userMsg.className = 'user-message';
             userMsg.textContent = text;
@@ -1131,6 +1320,7 @@
             input.value = '';
             messages.scrollTop = messages.scrollHeight;
 
+            // Indicateur de frappe
             const typing = document.createElement('div');
             typing.className = 'typing';
             typing.innerHTML = '<span></span><span></span><span></span>';
@@ -1143,24 +1333,197 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 });
+
                 const data = await response.json();
                 typing.remove();
 
+                // Afficher texte du bot
                 const botMsg = document.createElement('div');
                 botMsg.className = 'bot-message';
-                botMsg.textContent = data.response || ' Erreur';
+                botMsg.textContent = data.text || '❌ Erreur';
                 messages.appendChild(botMsg);
+
+                // ⭐ Afficher les cartes produits si présentes
+                if (data.products && data.products.length > 0) {
+                    const productsContainer = document.createElement('div');
+                    productsContainer.style.cssText = 'display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;';
+
+                    data.products.forEach(product => {
+                        const productCard = document.createElement('div');
+                        productCard.style.cssText = `
+                            background: white;
+                            border: 2px solid #e2e8f0;
+                            border-radius: 12px;
+                            padding: 12px;
+                            width: 160px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            transition: all 0.3s;
+                            cursor: pointer;
+                        `;
+
+                        productCard.innerHTML = `
+                            <img src="${product.imageUrl}"
+                                 alt="${product.nom}"
+                                 style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;"
+                                 onerror="this.src='https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=400'">
+                            <div style="font-weight: bold; font-size: 13px; margin-bottom: 6px; color: #1e293b; line-height: 1.3;">
+                                ${product.nom}
+                            </div>
+                            <div style="color: #dc2626; font-size: 16px; font-weight: bold; margin-bottom: 8px;">
+                                ${product.prix.toFixed(2)} MAD
+                            </div>
+                            <div style="font-size: 11px; color: #16a34a; margin-bottom: 8px; font-weight: 600;">
+                                Stock: ${product.stock}
+                            </div>
+                            <button onclick="addToCartFromChat(${product.id})"
+                                    style="width: 100%; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; border: none; padding: 8px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; transition: all 0.3s;">
+                                <i class="bi bi-cart-plus"></i> Ajouter
+                            </button>
+                        `;
+
+                        // Effet hover
+                        productCard.onmouseenter = () => {
+                            productCard.style.transform = 'translateY(-4px)';
+                            productCard.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+                        };
+                        productCard.onmouseleave = () => {
+                            productCard.style.transform = 'translateY(0)';
+                            productCard.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                        };
+
+                        productsContainer.appendChild(productCard);
+                    });
+
+                    messages.appendChild(productsContainer);
+                }
+
                 messages.scrollTop = messages.scrollHeight;
+
             } catch (error) {
                 typing.remove();
                 const errorMsg = document.createElement('div');
                 errorMsg.className = 'bot-message';
-                errorMsg.textContent = ' Erreur de connexion';
+                errorMsg.textContent = '❌ Erreur de connexion. Veuillez réessayer.';
                 messages.appendChild(errorMsg);
                 messages.scrollTop = messages.scrollHeight;
             }
         }
+
+        // ⭐ Fonction pour ajouter au panier depuis le chat
+               async function addToCartFromChat(productId) {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Ajout...';
+
+            try {
+                const response = await fetch(`/?handler=AddToCart&id=${productId}`, {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    }
+                });
+
+                if (response.ok) {
+                    button.innerHTML = '<i class="bi bi-check-circle"></i> Ajouté !';
+                    button.style.background = 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)';
+
+                    const messages = document.getElementById('chatMessages');
+                    const successMsg = document.createElement('div');
+                    successMsg.className = 'bot-message';
+                    successMsg.innerHTML = '✅ Produit ajouté au panier avec succès !';
+                    successMsg.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+                    successMsg.style.color = '#065f46';
+                    successMsg.style.fontWeight = '600';
+                    messages.appendChild(successMsg);
+                    messages.scrollTop = messages.scrollHeight;
+
+                    await updateCartCount();
+
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                        button.style.background = '';
+                    }, 2000);
+
+                } else {
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+
+                    const messages = document.getElementById('chatMessages');
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'bot-message';
+                    errorMsg.innerHTML = '❌ Erreur lors de l\'ajout';
+                    errorMsg.style.background = '#fee2e2';
+                    errorMsg.style.color = '#dc2626';
+                    messages.appendChild(errorMsg);
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        // ⭐ Mettre à jour le compteur panier
+        async function updateCartCount() {
+            try {
+                const response = await fetch('/?handler=CartCount');
+                const data = await response.json();
+
+                const cartBadge = document.querySelector('.cart-badge');
+
+                if (data.count > 0) {
+                    if (cartBadge) {
+                        cartBadge.textContent = data.count;
+                        cartBadge.style.animation = 'none';
+                        setTimeout(() => {
+                            cartBadge.style.animation = 'pulse 0.5s';
+                        }, 10);
+                    } else {
+                        const cartBtn = document.querySelector('.btn-cart');
+                        const badge = document.createElement('span');
+                        badge.className = 'cart-badge';
+                        badge.textContent = data.count;
+                        cartBtn.appendChild(badge);
+                    }
+                } else {
+                    if (cartBadge) cartBadge.remove();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+        
     </script>
+                <script>
+                    // Mise à jour des labels des sliders de prix
+                    const minSlider = document.getElementById('minPriceSlider');
+                    const maxSlider = document.getElementById('maxPriceSlider');
+                    const minLabel = document.getElementById('minPriceLabel');
+                    const maxLabel = document.getElementById('maxPriceLabel');
+
+                    function updateLabels() {
+                        let minVal = parseInt(minSlider.value);
+                        let maxVal = parseInt(maxSlider.value);
+
+                        if (minVal > maxVal) {
+                            minVal = maxVal;
+                            minSlider.value = minVal;
+                        }
+                        if (maxVal < minVal) {
+                            maxVal = minVal;
+                            maxSlider.value = maxVal;
+                        }
+
+                        minLabel.textContent = minVal;
+                        maxLabel.textContent = maxVal;
+                    }
+
+                    minSlider.addEventListener('input', updateLabels);
+                    maxSlider.addEventListener('input', updateLabels);
+                </script>
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

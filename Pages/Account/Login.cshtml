@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         body {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -25,9 +25,9 @@
 
         .login-card {
             background: white;
-            border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 3rem;
             max-width: 450px;
             width: 100%;
         }
@@ -55,42 +55,66 @@
 
         .form-control {
             border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 0.75rem;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
         }
 
             .form-control:focus {
-                border-color: #e74c3c;
-                box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.25);
+                border-color: #667eea;
+                box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
             }
 
         .btn-login {
-            background: #e74c3c;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             padding: 0.875rem;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
             width: 100%;
             margin-top: 1rem;
-            transition: all 0.2s;
+            transition: transform 0.2s;
         }
 
             .btn-login:hover {
-                background: #c0392b;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }
+
+        .divider {
+            text-align: center;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+            .divider::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 50%;
+                width: 100%;
+                height: 1px;
+                background: #e0e0e0;
+            }
+
+            .divider span {
+                background: white;
+                padding: 0 1rem;
+                position: relative;
+                color: #7f8c8d;
             }
 
         .register-link {
             text-align: center;
             margin-top: 1.5rem;
-            color: #7f8c8d;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
         }
 
             .register-link a {
-                color: #e74c3c;
+                color: #667eea;
                 font-weight: 600;
                 text-decoration: none;
             }
@@ -99,27 +123,27 @@
                     text-decoration: underline;
                 }
 
-        .back-home {
+        .back-link {
             text-align: center;
             margin-top: 1rem;
         }
 
-            .back-home a {
-                color: #95a5a6;
+            .back-link a {
+                color: #7f8c8d;
                 text-decoration: none;
                 font-size: 0.9rem;
             }
 
-                .back-home a:hover {
-                    color: #7f8c8d;
+                .back-link a:hover {
+                    color: #667eea;
                 }
     </style>
 </head>
 <body>
     <div class="login-card">
         <div class="login-header">
-            <h2><i class="bi bi-shield-lock-fill"></i> Connexion</h2>
-            <p>Accédez à votre compte MimiBout</p>
+            <h2><i class="bi bi-person-circle"></i> Connexion</h2>
+            <p>Connectez-vous pour continuer</p>
         </div>
 
         @if (TempData["Error"] != null)
@@ -129,29 +153,28 @@
             </div>
         }
 
-        @if (TempData["Message"] != null)
-        {
-            <div class="alert alert-success">
-                <i class="bi bi-check-circle"></i> @TempData["Message"]
-            </div>
-        }
-
         <form method="post">
+            <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+
             <div class="mb-3">
-                <label class="form-label">Email</label>
+                <label class="form-label">
+                    <i class="bi bi-envelope"></i> Email
+                </label>
                 <input type="email" class="form-control" asp-for="Email" required placeholder="votre@email.com" />
+                <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Mot de passe</label>
-                <input type="password" class="form-control" asp-for="Password" required />
+                <label class="form-label">
+                    <i class="bi bi-lock"></i> Mot de passe
+                </label>
+                <input type="password" class="form-control" asp-for="Password" required placeholder="••••••••" />
+                <span asp-validation-for="Password" class="text-danger"></span>
             </div>
 
             <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" asp-for="RememberMe" />
-                <label class="form-check-label">
-                    Se souvenir de moi
-                </label>
+                <input type="checkbox" class="form-check-input" asp-for="RememberMe" />
+                <label class="form-check-label">Se souvenir de moi</label>
             </div>
 
             <button type="submit" class="btn btn-login">
@@ -159,12 +182,22 @@
             </button>
         </form>
 
-        <div class="register-link">
-            Pas encore de compte ? <a href="/Account/Register">S'inscrire</a>
+        <div class="divider">
+            <span>OU</span>
         </div>
 
-        <div class="back-home">
-            <a href="/"><i class="bi bi-house"></i> Retour à l'accueil</a>
+        <div class="register-link">
+            <p class="mb-0">
+                <i class="bi bi-person-plus"></i> Vous n'avez pas de compte ?
+                <br>
+                <a href="/Account/Register?returnUrl=@Model.ReturnUrl">Créer un compte</a>
+            </p>
+        </div>
+
+        <div class="back-link">
+            <a href="/">
+                <i class="bi bi-arrow-left"></i> Retour à l'accueil
+            </a>
         </div>
     </div>
 

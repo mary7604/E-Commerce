@@ -1,18 +1,20 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using WebApplication1.Data;
+using WebApplication1.Services;
 
 namespace WebApplication1.Pages
 {
     public class CartModel : PageModel
     {
         private readonly ApplicationDbContext _context;
+        private readonly CartService _cartService;  //  Service Redis
 
-        public CartModel(ApplicationDbContext context)
+        public CartModel(ApplicationDbContext context, CartService cartService)
         {
             _context = context;
+            _cartService = cartService;
         }
 
         public List<CartItem> CartItems { get; set; } = new List<CartItem>();
@@ -23,22 +25,24 @@ namespace WebApplication1.Pages
 
         public async Task OnGetAsync()
         {
-            await LoadCart();
+            await LoadCartAsync();
         }
 
+        // Supprimer un produit du panier
         public async Task<IActionResult> OnPostRemoveAsync(int id)
         {
-            var cart = GetCartFromSession();
-            cart.RemoveAll(item => item.ProduitId == id);
-            SaveCartToSession(cart);
+            string userId = GetUserId();
+            await _cartService.RemoveFromCartAsync(userId, id);
 
             TempData["Message"] = "Produit retiré du panier";
             return RedirectToPage();
         }
 
+        // Mettre à jour la quantité
         public async Task<IActionResult> OnPostUpdateQuantityAsync(int id, string action)
         {
-            var cart = GetCartFromSession();
+            string userId = GetUserId();
+            var cart = await _cartService.GetCartAsync(userId);
             var item = cart.FirstOrDefault(i => i.ProduitId == id);
 
             if (item != null)
@@ -48,40 +52,51 @@ namespace WebApplication1.Pages
                 {
                     if (action == "increase" && item.Quantite < produit.Stock)
                     {
-                        item.Quantite++;
+                        await _cartService.UpdateQuantityAsync(userId, id, item.Quantite + 1);
+                        TempData["Message"] = "Quantité augmentée";
                     }
                     else if (action == "decrease")
                     {
-                        item.Quantite--;
-                        if (item.Quantite <= 0)
+                        if (item.Quantite > 1)
                         {
-                            cart.Remove(item);
+                            await _cartService.UpdateQuantityAsync(userId, id, item.Quantite - 1);
+                            TempData["Message"] = "Quantité diminuée";
+                        }
+                        else
+                        {
+                            await _cartService.RemoveFromCartAsync(userId, id);
+                            TempData["Message"] = "Produit retiré du panier";
                         }
                     }
-
-                    SaveCartToSession(cart);
-                    TempData["Message"] = "Quantité mise à jour";
                 }
             }
 
             return RedirectToPage();
         }
 
-        private async Task LoadCart()
+        //  Charger le panier depuis Redis
+        private async Task LoadCartAsync()
         {
-            var cart = GetCartFromSession();
+            string userId = GetUserId();
 
+            //  Récupérer depuis Redis
+            var cart = await _cartService.GetCartAsync(userId);
+
+            // Récupérer les détails des produits depuis la BDD
             var produitIds = cart.Select(c => c.ProduitId).ToList();
             var produits = await _context.Produits
                 .Where(p => produitIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id);
 
+            // Mettre à jour les informations du panier
             CartItems = cart.Select(c => {
                 if (produits.TryGetValue(c.ProduitId, out var produit))
                 {
                     c.Nom = produit.Nom;
                     c.Prix = produit.Prix;
                     c.ImageUrl = produit.ImageUrl;
+
+                    // Si la quantité dépasse le stock, ajuster
                     if (c.Quantite > produit.Stock)
                     {
                         c.Quantite = produit.Stock;
@@ -90,57 +105,46 @@ namespace WebApplication1.Pages
                 return c;
             }).ToList();
 
+            // Sauvegarder les ajustements dans Redis
+            await _cartService.SaveCartAsync(userId, CartItems);
+
+            // Calculer les totaux
             Subtotal = CartItems.Sum(item => item.Prix * item.Quantite);
             ShippingCost = Subtotal >= 500 ? 0 : 50;
             Total = Subtotal + ShippingCost;
             TotalItems = CartItems.Sum(item => item.Quantite);
-
-            SaveCartToSession(CartItems);
         }
 
-        private List<CartItem> GetCartFromSession()
+        // Obtenir l'ID utilisateur
+        private string GetUserId()
         {
-            // Essayer de lire depuis la session
-            var cartJson = HttpContext.Session.GetString("Cart");
-
-            // Si pas dans session, essayer depuis les cookies
-            if (string.IsNullOrEmpty(cartJson))
+            //  Utilisateur connecté
+            if (User.Identity?.IsAuthenticated == true)
             {
-                cartJson = Request.Cookies["Cart"];
+                return User.Identity.Name ?? "guest";
             }
 
-            if (string.IsNullOrEmpty(cartJson))
+            // Visiteur non connecté = Cookie permanent (30 jours)
+            string? userId = Request.Cookies["GuestCartId"];
+
+            if (string.IsNullOrEmpty(userId))
             {
-                return new List<CartItem>();
+                // Créer un nouvel ID unique
+                userId = $"guest_{Guid.NewGuid()}";
+
+                // Stocker dans un cookie permanent
+                var cookieOptions = new CookieOptions
+                {
+                    Expires = DateTimeOffset.UtcNow.AddDays(30),
+                    HttpOnly = true,
+                    SameSite = SameSiteMode.Lax,
+                    IsEssential = true
+                };
+
+                Response.Cookies.Append("GuestCartId", userId, cookieOptions);
             }
 
-            try
-            {
-                return JsonSerializer.Deserialize<List<CartItem>>(cartJson) ?? new List<CartItem>();
-            }
-            catch
-            {
-                return new List<CartItem>();
-            }
-        }
-
-        private void SaveCartToSession(List<CartItem> cart)
-        {
-            var cartJson = JsonSerializer.Serialize(cart);
-
-            // Sauvegarder dans la session
-            HttpContext.Session.SetString("Cart", cartJson);
-
-            // Sauvegarder aussi dans un cookie persistant (30 jours)
-            Response.Cookies.Append("Cart", cartJson, new CookieOptions
-            {
-                Expires = DateTimeOffset.Now.AddDays(30),
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict
-            });
+            return userId;
         }
     }
-
-    
 }

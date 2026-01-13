@@ -35,7 +35,7 @@ namespace WebApplication1.Pages.Account
 
         [BindProperty]
         [Required]
-        [MinLength(6)]
+        [MinLength(6, ErrorMessage = "Le mot de passe doit contenir au moins 6 caractères")]
         public string Password { get; set; } = string.Empty;
 
         [BindProperty]
@@ -43,12 +43,18 @@ namespace WebApplication1.Pages.Account
         [Compare("Password", ErrorMessage = "Les mots de passe ne correspondent pas")]
         public string ConfirmPassword { get; set; } = string.Empty;
 
-        public void OnGet()
+        //  Pour savoir où rediriger après inscription
+        public string? ReturnUrl { get; set; }
+
+        public void OnGet(string? returnUrl = null)
         {
+            ReturnUrl = returnUrl ?? TempData["ReturnUrl"]?.ToString();
         }
 
-        public async Task<IActionResult> OnPostAsync()
+        public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
         {
+            ReturnUrl = returnUrl ?? TempData["ReturnUrl"]?.ToString();
+
             if (!ModelState.IsValid)
             {
                 return Page();
@@ -58,16 +64,24 @@ namespace WebApplication1.Pages.Account
 
             if (client == null)
             {
-                TempData["Error"] = "Cet email est déjà utilisé";
+                TempData["Error"] = " Cet email est déjà utilisé";
                 return Page();
             }
 
-            // Connecter automatiquement après inscription
+            //  Connecter automatiquement après inscription
             HttpContext.Session.SetInt32("ClientId", client.Id);
             HttpContext.Session.SetString("ClientName", $"{client.Prenom} {client.Nom}");
             HttpContext.Session.SetString("ClientEmail", client.Email);
 
-            TempData["Message"] = "Compte créé avec succès !";
+            TempData["Message"] = " Compte créé avec succès ! Bienvenue !";
+
+            // Rediriger vers la page demandée (Checkout) ou Index
+            if (!string.IsNullOrEmpty(ReturnUrl) && Url.IsLocalUrl(ReturnUrl))
+            {
+                Console.WriteLine($"Redirection vers : {ReturnUrl}");
+                return Redirect(ReturnUrl);
+            }
+
             return RedirectToPage("/Index");
         }
     }
