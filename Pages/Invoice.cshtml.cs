@@ -24,12 +24,21 @@ namespace WebApplication1.Pages
         public async Task<IActionResult> OnGetAsync(int id)
         {
             var commande = await _context.Commandes
-                .Include(c => c.LignesCommande)  // Charger les produits
+                .Include(c => c.LignesCommande)
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (commande == null)
             {
                 return NotFound();
+            }
+
+            // client connecté OU commande invitée
+            var sessionClientId = HttpContext.Session.GetInt32("ClientId");
+
+            if (commande.ClientId != null)
+            {
+                if (!sessionClientId.HasValue || sessionClientId.Value != commande.ClientId)
+                    return Unauthorized();
             }
 
             Commande = commande;
@@ -50,12 +59,13 @@ namespace WebApplication1.Pages
             }
 
             InvoiceHtml = _invoiceService.GenerateInvoiceHtml(
-                commande,    
+                commande,
                 subtotal,
                 shipping
             );
 
             return Page();
         }
+
     }
 }

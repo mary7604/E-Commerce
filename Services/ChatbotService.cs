@@ -84,7 +84,7 @@ Question client : {userMessage}
 
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={apiKey}";
 
-            // ⭐ Retry avec délai exponentiel
+            // Retry avec délai exponentiel
             int maxRetries = 3;
             int retryCount = 0;
 
@@ -112,7 +112,7 @@ Question client : {userMessage}
                             .GetProperty("text")
                             .GetString() ?? "Aucune réponse générée.";
 
-                        // ⭐ Extraire les IDs de produits mentionnés
+                        // Extraire les IDs de produits mentionnés
                         var productIds = ExtractProductIds(geminiText);
                         var recommendedProducts = new List<ProductCard>();
 
@@ -189,7 +189,7 @@ Question client : {userMessage}
             };
         }
 
-        // ⭐ Extraire les IDs des produits du texte Gemini
+        // Extraire les IDs des produits du texte Gemini
         private List<int> ExtractProductIds(string text)
         {
             var ids = new List<int>();
@@ -206,7 +206,7 @@ Question client : {userMessage}
             return ids;
         }
 
-        // ⭐ Réponse de secours avec détection mots-clés
+        // Réponse de secours avec détection mots-clés
         private ChatResponse GetFallbackResponse(string userMessage, List<ProductDto> produits)
         {
             var messageLower = userMessage.ToLower();
@@ -269,7 +269,7 @@ Question client : {userMessage}
         }
     }
 
-    // ⭐ Modèles de réponse
+    // Modèles de réponse
     public class ChatResponse
     {
         public string Text { get; set; } = string.Empty;
@@ -285,7 +285,7 @@ Question client : {userMessage}
         public int Stock { get; set; }
     }
 
-    // ⭐ DTO pour éviter les types anonymes
+    // DTO pour éviter les types anonymes
     public class ProductDto
     {
         public int Id { get; set; }

@@ -9,7 +9,7 @@ namespace WebApplication1.Pages
     public class CartModel : PageModel
     {
         private readonly ApplicationDbContext _context;
-        private readonly CartService _cartService;  //  Service Redis
+        private readonly CartService _cartService;
 
         public CartModel(ApplicationDbContext context, CartService cartService)
         {
@@ -17,7 +17,7 @@ namespace WebApplication1.Pages
             _cartService = cartService;
         }
 
-        public List<CartItem> CartItems { get; set; } = new List<CartItem>();
+        public List<Services.CartItem> CartItems { get; set; } = new List<Services.CartItem>();
         public decimal Subtotal { get; set; }
         public decimal ShippingCost { get; set; }
         public decimal Total { get; set; }
@@ -52,15 +52,15 @@ namespace WebApplication1.Pages
                 {
                     if (action == "increase" && item.Quantite < produit.Stock)
                     {
-                        await _cartService.UpdateQuantityAsync(userId, id, item.Quantite + 1);
-                        TempData["Message"] = "Quantité augmentée";
+                        var (success, message) = await _cartService.UpdateQuantityAsync(userId, id, item.Quantite + 1);
+                        TempData["Message"] = success ? "Quantité augmentée" : message;
                     }
                     else if (action == "decrease")
                     {
                         if (item.Quantite > 1)
                         {
-                            await _cartService.UpdateQuantityAsync(userId, id, item.Quantite - 1);
-                            TempData["Message"] = "Quantité diminuée";
+                            var (success, message) = await _cartService.UpdateQuantityAsync(userId, id, item.Quantite - 1);
+                            TempData["Message"] = success ? "Quantité diminuée" : message;
                         }
                         else
                         {
@@ -68,18 +68,22 @@ namespace WebApplication1.Pages
                             TempData["Message"] = "Produit retiré du panier";
                         }
                     }
+                    else if (action == "increase" && item.Quantite >= produit.Stock)
+                    {
+                        TempData["Error"] = $"Stock maximum atteint ({produit.Stock} unités disponibles)";
+                    }
                 }
             }
 
             return RedirectToPage();
         }
 
-        //  Charger le panier depuis Redis
+        // Charger le panier depuis Redis
         private async Task LoadCartAsync()
         {
             string userId = GetUserId();
 
-            //  Récupérer depuis Redis
+            // Récupérer depuis Redis
             var cart = await _cartService.GetCartAsync(userId);
 
             // Récupérer les détails des produits depuis la BDD
@@ -118,7 +122,7 @@ namespace WebApplication1.Pages
         // Obtenir l'ID utilisateur
         private string GetUserId()
         {
-            //  Utilisateur connecté
+            // Utilisateur connecté
             if (User.Identity?.IsAuthenticated == true)
             {
                 return User.Identity.Name ?? "guest";

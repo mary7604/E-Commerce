@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
 using WebApplication1.Services;
@@ -7,17 +6,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 // CACHE
 builder.Services.AddMemoryCache();
+builder.Services.AddDistributedMemoryCache();
 
 // Add services
 builder.Services.AddRazorPages();
-
-builder.Services.AddControllers(); //  Pour API
-
+builder.Services.AddControllers();
 
 // Database Context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Session
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -25,18 +24,11 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
-// REDIS 
-builder.Services.AddStackExchangeRedisCache(options =>
-{
-    options.Configuration = builder.Configuration["Redis:ConnectionString"];
-    options.InstanceName = "MonApp_";
-});
-
 // Services
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<InvoiceService>();
 builder.Services.AddScoped<ClientAuthService>();
-builder.Services.AddScoped<CartService>();  // Service Panier avec Redis
+builder.Services.AddScoped<CartService>(); 
 
 // Chatbot avec Gemini API
 builder.Services.AddHttpClient();
@@ -57,7 +49,7 @@ app.UseRouting();
 app.UseSession();
 app.UseAuthorization();
 app.MapRazorPages();
-app.MapControllers();  //  Pour API
+app.MapControllers();
 
 app.Run();
-//mimi sam
+//mery sam 

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Text.Json;
 using WebApplication1.Data;
 using WebApplication1.Models;
 using WebApplication1.Services;
@@ -65,7 +66,7 @@ namespace WebApplication1.Pages
         {
             const string cacheKey = "produits_liste";
 
-            if (!_cache.TryGetValue(cacheKey, out List<Produit> produits))
+            if (!_cache.TryGetValue(cacheKey, out List<Produit>? produits) || produits == null)
             {
                 produits = await _context.Produits
                     .AsNoTracking()
@@ -83,7 +84,6 @@ namespace WebApplication1.Pages
             string? search, List<string>? categories, decimal? minPrix, decimal? maxPrix)
         {
             var query = _context.Produits.AsNoTracking();
-          
 
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(p => p.Nom.Contains(search) || (p.Description != null && p.Description.Contains(search)));
@@ -104,7 +104,7 @@ namespace WebApplication1.Pages
         {
             const string cacheKey = "categories_liste";
 
-            if (!_cache.TryGetValue(cacheKey, out List<string> categories))
+            if (!_cache.TryGetValue(cacheKey, out List<string>? categories) || categories == null)
             {
                 categories = await _context.Produits
                      .AsNoTracking()
@@ -138,7 +138,8 @@ namespace WebApplication1.Pages
 
             string userId = GetUserId();
 
-            var item = new CartItem
+            // Utiliser le CartItem du namespace Services
+            var item = new Services.CartItem
             {
                 ProduitId = produit.Id,
                 Nom = produit.Nom,
@@ -147,12 +148,13 @@ namespace WebApplication1.Pages
                 ImageUrl = produit.ImageUrl
             };
 
-            var result = await _cartService.AddToCartAsync(userId, item);
+            // La méthode retourne un tuple (bool Success, string Message)
+            var (success, message) = await _cartService.AddToCartAsync(userId, item);
 
-            if (result.Success)
-                TempData["Message"] = result.Message;
+            if (success)
+                TempData["Message"] = message;
             else
-                TempData["Error"] = result.Message;
+                TempData["Error"] = message;
 
             return RedirectToPage();
         }
@@ -164,7 +166,7 @@ namespace WebApplication1.Pages
 
         private string GetUserId()
         {
-            //  Utilisateur connecté
+            // Utilisateur connecté
             if (User.Identity?.IsAuthenticated == true)
             {
                 return User.Identity.Name ?? "guest";
@@ -192,6 +194,7 @@ namespace WebApplication1.Pages
 
             return userId;
         }
+
         public async Task<IActionResult> OnGetCartCountAsync()
         {
             var count = await GetCartCountAsync();
